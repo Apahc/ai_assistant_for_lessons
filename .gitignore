@@ -1,0 +1,7 @@
+.env
+.venv
+
+#database
+database/encoding.ipynb
+database/encoding.py
+

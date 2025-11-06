@@ -9,3 +9,18 @@
 | 1. Методология | Татьяна | Яна, Алина |
 | 2. Прототип | Дмитрий | Степан, Андрей, Яна |
 | 3. UI | Алина | — |
+
+## Требования
+
+```
+python 3.13
+.venv\\Scripts\\activate
+```
+Для разработки:
+```
+pip install -r requirements_dev.txt
+```
+Для запуска программы:
+```
+pip install -r requirements.txt
+```
