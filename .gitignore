@@ -3,5 +3,9 @@
 
 #database
 database/encoding.ipynb
-database/encoding.py
-
+database/encoding_names.py
+database/LL.xlsx
+database/clean_LL.xlsx
+database/clean_LL.json
+database/encoding.json
+database/__pycache__
