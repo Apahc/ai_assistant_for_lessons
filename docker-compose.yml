@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+
+  database:
+    build: ./database
+    container_name: database
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./database/chroma_db:/data/chroma
+      - ./database/lessons.json:/data/lessons.json:ro
+    environment:
+      CHROMA_PERSIST_DIR: "/data/chroma"
+    restart: unless-stopped
+
+networks:
+  default:
+    name: lessons_network
