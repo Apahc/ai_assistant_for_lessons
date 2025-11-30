@@ -1,7 +1,5 @@
 fastapi
 uvicorn[standard]
-chromadb
-sentence-transformers
+chromadb[all]
 pydantic
 python-multipart
-pandas
