@@ -4,4 +4,3 @@ chromadb
 sentence-transformers
 pydantic
 python-multipart
-pandas

@@ -2,6 +2,26 @@ version: "3.9"
 
 services:
 
+  backend:
+    build: ./backend
+    container_name: backend
+    ports:
+      - "8000:8000"
+    environment:
+      HF_TOKEN: ${HF_TOKEN}
+      LLAMA_MODEL: ${LLAMA_MODEL}
+      LLAMA_PROVIDER: ${LLAMA_PROVIDER}
+      CHROMA_HOST: database
+      CHROMA_PORT: 8001
+      RAG_TOP_K: ${RAG_TOP_K}
+      RAG_CHUNK_MAX_CHARS: ${RAG_CHUNK_MAX_CHARS}
+      RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP}
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+    depends_on:
+      - database
+    restart: unless-stopped
+
   database:
     build: ./database
     container_name: database
