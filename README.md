@@ -23,13 +23,40 @@ docker compose build --no-cache
 ```bash
 docker compose up
 ```
-4) Выполнить запросы к сервису через Postman или при помощи curl:
-```bash
-curl -X POST http://localhost:8000/api/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "Как мне составить письмо с информацией о 5ти самых полезных уроках за последний год?",
-    "top_k": 5,
-    "use_query_refinement": true
-  }'
+4) Создать файл `.env` в корне проекта с переменными:
+```env
+hf_token=your_huggingface_token
+CHROMA_HOST=localhost
+CHROMA_PORT=8001
+LLAMA_MODEL=meta-llama/Llama-3.3-70B-Instruct
+LLAMA_PROVIDER=groq
+```
+
+## API Endpoints
+
+### GET `/`
+Корневой endpoint с информацией о сервисе
+
+### GET `/api/v1/health`
+Проверка здоровья сервиса и его компонентов
+
+### POST `/api/v1/search`
+Поиск уроков в базе знаний
+```json
+{
+  "query": "проблема с производительностью",
+  "top_k": 5,
+  "metadata_filter": null
+}
+```
+
+### POST `/api/v1/chat`
+Консультация с использованием RAG
+```json
+{
+  "question": "Как решить проблему с производительностью?",
+  "top_k": 5,
+  "use_query_refinement": true,
+  "metadata_filter": null
+}
 ```
