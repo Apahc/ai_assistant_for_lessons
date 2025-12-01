@@ -1,6 +1,6 @@
+chromadb==0.5.3
+uvicorn
 fastapi
-uvicorn[standard]
-chromadb
-sentence-transformers
-pydantic
-python-multipart
+numpy<2.0
+onnxruntime
+requests

@@ -1,12 +1,17 @@
-FROM python:3.13-slim
+FROM python:3.10-slim
 
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-
-ENV CHROMA_PERSIST_DIR=/data/chroma
-
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001"]
+RUN mkdir -p /data/chroma
+COPY entrypoint.sh /app/
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
