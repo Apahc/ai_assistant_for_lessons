@@ -1,7 +1,7 @@
 """
 Модели данных для API
 """
-from .schemas import (
+from models.schemas import (
     QueryRequest,
     QueryResponse,
     LessonChunk,

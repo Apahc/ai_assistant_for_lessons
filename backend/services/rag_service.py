@@ -3,8 +3,8 @@ RAG сервис для работы с ChromaDB
 """
 import httpx
 from typing import List, Optional, Dict, Any
-from ..config import CHROMA_HOST, CHROMA_PORT, CHROMA_COLLECTION_NAME, RAG_TOP_K
-from ..models.schemas import LessonChunk, QueryRequest, QueryResponse
+from config import CHROMA_HOST, CHROMA_PORT, CHROMA_COLLECTION_NAME, RAG_TOP_K
+from models.schemas import LessonChunk, QueryRequest, QueryResponse
 
 
 class RAGService:

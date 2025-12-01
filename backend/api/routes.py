@@ -3,15 +3,15 @@ API маршруты для RAG системы
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
-from ..models.schemas import (
+from models.schemas import (
     QueryRequest,
     QueryResponse,
     ChatRequest,
     ChatResponse,
     HealthResponse
 )
-from ..services.rag_service import RAGService
-from ..services.llm_service import LLMService
+from services.rag_service import RAGService
+from services.llm_service import LLMService
 
 router = APIRouter(prefix="/api/v1", tags=["RAG API"])
 

@@ -3,8 +3,8 @@
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api.routes import router
-from .config import API_HOST, API_PORT
+from api.routes import router
+from config import API_HOST, API_PORT
 
 app = FastAPI(
     title="AI Assistant for Lessons - RAG API",

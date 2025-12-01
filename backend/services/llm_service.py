@@ -4,8 +4,8 @@
 import os
 from typing import Optional
 from huggingface_hub import InferenceClient
-from ..config import HF_TOKEN, LLAMA_MODEL, LLAMA_PROVIDER
-from ..prompts import (
+from config import HF_TOKEN, LLAMA_MODEL, LLAMA_PROVIDER
+from prompts import (
     RAG_ANSWER_PROMPT,
     QUERY_REFINEMENT_PROMPT,
     KEYWORD_EXTRACTION_PROMPT,

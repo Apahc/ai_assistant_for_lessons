@@ -1,6 +1,5 @@
 import json
 import chromadb
-from chromadb.config import Settings
 import chromadb.utils.embedding_functions as ef
 import os
 from hashlib import md5
@@ -8,11 +7,8 @@ from typing import List
 
 persist_dir = os.getenv("CHROMA_PERSIST_DIR", "/data/chroma")
 
-client = chromadb.Client(
-    Settings(
-        chroma_db_impl="duckdb+parquet",
-        persist_directory=persist_dir
-    )
+client = chromadb.PersistentClient(
+    path=persist_dir
 )
 
 embed_fn = ef.DefaultEmbeddingFunction()
