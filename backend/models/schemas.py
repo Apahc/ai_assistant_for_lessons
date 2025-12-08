@@ -4,7 +4,6 @@ Pydantic схемы для валидации данных
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
-
 class LessonChunk(BaseModel):
     """Модель чанка урока из ChromaDB"""
     id: str
@@ -28,7 +27,12 @@ class QueryResponse(BaseModel):
     query: str
     results: List[LessonChunk]
     total_results: int
+from enum import Enum
 
+class ChatType(str, Enum):
+    QUESTION = "question"   # дефолт, как сейчас
+    DOCUMENT = "document"   # генерировать документ
+    LETTER   = "letter"     # генерировать письмо
 
 class ChatRequest(BaseModel):
     """Запрос на консультацию с использованием RAG"""
@@ -41,6 +45,10 @@ class ChatRequest(BaseModel):
     metadata_filter: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Фильтр по метаданным"
+    )
+    chat_type: ChatType = Field(
+        default=ChatType.QUESTION,
+        description="Тип генерируемого контента"
     )
 
 

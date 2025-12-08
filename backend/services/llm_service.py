@@ -9,7 +9,10 @@ from prompts import (
     RAG_ANSWER_PROMPT,
     QUERY_REFINEMENT_PROMPT,
     KEYWORD_EXTRACTION_PROMPT,
-    LESSONS_SUMMARY_PROMPT
+    LESSONS_SUMMARY_PROMPT,
+    RAG_DOCUMENT_PROMPT,
+    RAG_LETTER_PROMPT,
+    RAG_QUESTION_PROMPT
 )
 
 
@@ -76,27 +79,45 @@ class LLMService:
         except Exception as e:
             print(f"Произошла ошибка при вызове API: {e}")
             return None
-    
+
     def generate_rag_answer(
-        self, 
-        question: str, 
-        context: str
+            self,
+            question: str,
+            context: str,
+            chat_type: str = "question"
     ) -> Optional[str]:
-        """
-        Генерирует ответ на основе контекста из RAG
-        
-        Args:
-            question: Вопрос пользователя
-            context: Контекст из базы знаний
-            
-        Returns:
-            Сгенерированный ответ
-        """
-        prompt = RAG_ANSWER_PROMPT.format(
+
+        if not context or not context.strip():
+            return "По этому вопросу в базе уроков пока ничего нет."
+
+        relevance_check_prompt = RAG_ANSWER_PROMPT.format(
             context=context,
             question=question
         )
-        return self.query_llama_api(prompt)
+        relevance_response = self.query_llama_api(relevance_check_prompt)
+
+        is_relevant = not (relevance_response and "нет" in relevance_response.lower())
+
+        extra_instruction = ""
+        if not is_relevant:
+            extra_instruction = (
+                "\n\nВнимание: контекст слабо релевантен вопросу!\n"
+                "Обязательно начни ответ со строки: «Релевантность: Косвенно применимо»\n"
+                "И сделай ответ ОЧЕНЬ КОРОТКИМ — максимум 4–5 строк. "
+                "Всё равно дай самый близкий совет из имеющихся уроков."
+            )
+
+        if chat_type == "document":
+            prompt = RAG_DOCUMENT_PROMPT.format(context=context, question=question)
+        elif chat_type == "letter":
+            prompt = RAG_LETTER_PROMPT.format(context=context, question=question)
+        else:
+            prompt = RAG_QUESTION_PROMPT.format(context=context, question=question)
+
+        prompt += extra_instruction
+
+        final_answer = self.query_llama_api(prompt)
+        return final_answer or "Не удалось сгенерировать ответ (ошибка модели)."
     
     def refine_query(self, query: str) -> Optional[str]:
         """
