@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # API Configuration
-HF_TOKEN = os.environ.get("hf_token")
+HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("hf_token")
 LLAMA_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
 LLAMA_PROVIDER = "groq"
 

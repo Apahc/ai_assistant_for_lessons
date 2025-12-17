@@ -86,7 +86,8 @@ async def chat_with_rag(
                 answer="К сожалению, в базе знаний не найдено релевантной информации для вашего вопроса.",
                 question=request.question,
                 context_chunks=[],
-                sources_count=0
+                sources_count=0,
+                chat_type = request.chat_type
             )
         
         # Форматирование контекста
@@ -97,7 +98,8 @@ async def chat_with_rag(
         if llm_service.is_available():
             generated_answer = llm_service.generate_rag_answer(
                 question=request.question,
-                context=context
+                context=context,
+                chat_type=request.chat_type
             )
             if generated_answer:
                 answer = generated_answer
@@ -109,7 +111,8 @@ async def chat_with_rag(
             answer=answer,
             question=request.question,
             context_chunks=search_results.results,
-            sources_count=len(search_results.results)
+            sources_count=len(search_results.results),
+            chat_type=request.chat_type
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при генерации ответа: {str(e)}")
