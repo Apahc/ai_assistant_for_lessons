@@ -1,0 +1,40 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Shell scripts должны всегда использовать LF
+*.sh text eol=lf
+
+# Python scripts
+*.py text eol=lf
+
+# JavaScript
+*.js text eol=lf
+
+# Web files
+*.html text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+
+# Docker files
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# Config files
+*.env text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary

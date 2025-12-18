@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Виджет чата ИИ-ассистента</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <button class="chat-launcher" id="chatLauncher" aria-label="Открыть чат">
+    💬
+  </button>
+
+  <div class="chat-wrapper" id="chatWrapper" aria-live="polite">
+    <div class="chat-header">
+      <span class="chat-title">ИИ-ассистент</span>
+      <div class="chat-actions">
+        <button id="expandChat" class="icon-btn" aria-label="Расширить чат" title="Расширить">⤢</button>
+        <button id="closeChat" class="icon-btn" aria-label="Закрыть чат" title="Закрыть">×</button>
+      </div>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="chips" id="chipsBar">
+      Хочу предложить
+      <button class="chip">Срыв сроков</button>
+      <button class="chip">Бетонирование</button>
+      <button class="chip">Технологии 5С</button>
+    </div>
+
+    <div class="context-buttons" id="contextButtons">
+      <button class="context-btn active" data-type="question" title="Вопрос">Вопрос</button>
+      <button class="context-btn" data-type="letter" title="Письмо">Письмо</button>
+      <button class="context-btn" data-type="document" title="Документ">Документ</button>
+    </div>
+
+    <div class="composer">
+      <input id="messageInput" type="text" placeholder="Что вы хотите найти?" />
+      <button class="send-btn" id="sendBtn" aria-label="Отправить сообщение">➤</button>
+    </div>
+  </div>
+
+  <div class="assistant-overlay" id="assistantOverlay">
+    <div class="assistant-container">
+      <header class="assistant-header">
+        <button class="back-btn" id="assistantBack" aria-label="Вернуться к виджету">←</button>
+        <h1>ИИ-ассистент</h1>
+        <span class="assistant-date">11.11.2025</span>
+      </header>
+
+      <main class="assistant-main">
+        <aside class="assistant-sidebar">
+          <section class="history-panel">
+            <div class="history-title">История</div>
+            <div class="history-list" id="lessonHistory"></div>
+          </section>
+        </aside>
+
+        <section class="assistant-chat">
+          <div class="assistant-messages" id="assistantMessages"></div>
+
+          <div class="assistant-chips" id="assistantChips">
+            Хочу предложить
+            <button class="chip">Срыв сроков</button>
+            <button class="chip">Бетонирование</button>
+            <button class="chip">Технологии 5С</button>
+          </div>
+
+          <div class="context-buttons" id="assistantContextButtons">
+            <button class="context-btn active" data-type="question" title="Вопрос">Вопрос</button>
+            <button class="context-btn" data-type="letter" title="Письмо">Письмо</button>
+            <button class="context-btn" data-type="document" title="Документ">Документ</button>
+          </div>
+
+          <div class="assistant-composer">
+            <input type="text" id="assistantInput" placeholder="Что вы хотите найти?" />
+            <button class="send-btn" id="assistantSend" aria-label="Отправить сообщение">➤</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/chat-widget.js"></script>
+</body>
+</html>
