@@ -113,6 +113,29 @@ function formatContextChunks(chunks) {
   return html;
 }
 
+function formatLessonParagraphs(text) {
+  if (!text) return '';
+
+  const parts = text.split(/(?=---\s*Урок\s+\d+\s*---)/g);
+  if (parts.length === 1) {
+    return text;
+  }
+
+  return parts
+    .map((part, index) => {
+      const trimmed = part.trim();
+      if (!trimmed) return '';
+
+      const normalized = trimmed.replace(/\n/g, '<br>');
+      if (index === 0 && !trimmed.startsWith('--- Урок')) {
+        return normalized;
+      }
+
+      return `<p>${normalized}</p>`;
+    })
+    .join('');
+}
+
 function seedSmallConversation() {
   renderDate(new Date().toLocaleDateString('ru-RU'));
   renderMessage({
@@ -204,7 +227,7 @@ async function handleSendSmall() {
     removeLoadingMessage(loadingBubble);
     
     // Отображаем ответ
-    let answerText = response.answer;
+    let answerText = formatLessonParagraphs(response.answer);
     if (response.context_chunks && response.context_chunks.length > 0) {
       answerText += '<br><br>' + formatContextChunks(response.context_chunks);
     }
@@ -247,7 +270,7 @@ async function handleSendLarge() {
     removeLoadingMessage(loadingBubble);
     
     // Отображаем ответ
-    let answerText = response.answer;
+    let answerText = formatLessonParagraphs(response.answer);
     if (response.context_chunks && response.context_chunks.length > 0) {
       answerText += '<br><br>' + formatContextChunks(response.context_chunks);
     }
