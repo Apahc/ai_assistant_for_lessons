@@ -21,7 +21,7 @@
 
 ## Быстрый старт
 
-1. Скопируйте `.env.example` в `.env`
+1. Проверьте настройки в `.env`
 2. Запустите `docker compose up --build`
 3. Откройте `http://localhost:8080`
 

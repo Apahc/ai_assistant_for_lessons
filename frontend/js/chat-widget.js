@@ -82,7 +82,7 @@ async function sendMessage(sourceInput, targetContainer) {
   try {
     const response = await apiService.respond(sessionId, message, currentMode);
     loader.remove();
-    bubble(targetContainer, response.answer, 'assistant');
+    bubble(targetContainer, response.text || response.answer || '', 'assistant');
     if (targetContainer === assistantMessages) {
       syncLargeToSmall();
     } else {

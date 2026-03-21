@@ -10,7 +10,7 @@ class APIService {
   }
 
   async respond(sessionId, message, mode) {
-    const response = await fetch(`${this.baseUrl}${API_CONFIG.endpoints.respond}`, {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.endpoints.message}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId, message, mode }),

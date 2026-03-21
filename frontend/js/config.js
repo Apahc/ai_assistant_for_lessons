@@ -5,7 +5,7 @@ const API_CONFIG = {
   endpoints: {
     createSession: '/api/v1/sessions',
     closeSession: (sessionId) => `/api/v1/sessions/${sessionId}/close`,
-    respond: '/api/v1/respond',
+    message: '/message',
     health: '/api/v1/health',
   },
 };

@@ -1,8 +1,11 @@
 import os
 
-HF_TOKEN = os.getenv("HF_TOKEN", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "meta-llama/Llama-3.3-70B-Instruct")
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("hf_token", "")
+LLM_MODEL = os.getenv("LLM_MODEL") or os.getenv("LLAMA_MODEL", "meta-llama/Llama-3.3-70B-Instruct")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER") or os.getenv("LLAMA_PROVIDER", "groq")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "").strip()
+LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 
 MEMORY_SERVICE_URL = os.getenv("MEMORY_SERVICE_URL", "http://memory-service:8005")
 RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service:8002")
