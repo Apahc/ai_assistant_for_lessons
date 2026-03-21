@@ -9,6 +9,7 @@ services:
       - .env
     environment:
       FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:8081}
+      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8000}
     ports:
       - "${PORTAL_PORT:-8080}:80"
     depends_on:
@@ -48,8 +49,16 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
-      - memory-service
-      - rag-service
+      memory-service:
+        condition: service_healthy
+      rag-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
     networks:
       - lessons-net
@@ -75,9 +84,18 @@ services:
     volumes:
       - ./data:/data:ro
     depends_on:
-      - chroma
-      - embed-service
-      - reranker-service
+      chroma:
+        condition: service_started
+      embed-service:
+        condition: service_healthy
+      reranker-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
     networks:
       - lessons-net
@@ -90,6 +108,12 @@ services:
       - .env
     ports:
       - "${EMBED_SERVICE_PORT:-8003}:8003"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
     networks:
       - lessons-net
@@ -102,6 +126,12 @@ services:
       - .env
     ports:
       - "${RERANKER_SERVICE_PORT:-8004}:8004"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
     restart: unless-stopped
     networks:
       - lessons-net
@@ -119,8 +149,16 @@ services:
     ports:
       - "${MEMORY_SERVICE_PORT:-8005}:8005"
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8005/health/ready', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
     networks:
       - lessons-net
@@ -149,6 +187,11 @@ services:
       - .env
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
     networks:
       - lessons-net
@@ -165,6 +208,11 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lessons} -d ${POSTGRES_DB:-lessons}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
     networks:
       - lessons-net

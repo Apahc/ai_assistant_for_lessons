@@ -1,5 +1,6 @@
 <?php
 $frontendUrl = getenv('FRONTEND_PUBLIC_URL') ?: 'http://localhost:8081';
+$backendUrl = getenv('BACKEND_PUBLIC_URL') ?: 'http://localhost:8000';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -206,7 +207,7 @@ $frontendUrl = getenv('FRONTEND_PUBLIC_URL') ?: 'http://localhost:8081';
           </div>
         </div>
       </div>
-      <iframe class="widget-frame" src="<?php echo htmlspecialchars($frontendUrl . '/demo.html', ENT_QUOTES, 'UTF-8'); ?>" title="Lessons frontend"></iframe>
+      <iframe class="widget-frame" src="<?php echo htmlspecialchars($frontendUrl . '/demo.html?backendUrl=' . rawurlencode($backendUrl), ENT_QUOTES, 'UTF-8'); ?>" title="Lessons frontend"></iframe>
     </section>
   </main>
 </body>

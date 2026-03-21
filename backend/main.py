@@ -67,6 +67,21 @@ class BackendService:
             response.raise_for_status()
             return response.json()
 
+    async def call_rag_safe(self, payload: dict) -> dict:
+        try:
+            return await self.call_rag(payload)
+        except httpx.HTTPError:
+            return {
+                "context": "",
+                "meta_context": "",
+                "results": [],
+                "lesson_results": [],
+                "meta_results": [],
+                "lessons_texts": [],
+                "lessons_count": 0,
+                "meta_count": 0,
+            }
+
     def history_to_text(self, messages: list[dict]) -> str:
         if not messages:
             return "История пока пустая."
@@ -156,7 +171,7 @@ class BackendService:
             {"role": "user", "content": request.message, "mode": request.mode},
         )
 
-        retrieval = await self.call_rag(
+        retrieval = await self.call_rag_safe(
             {
                 "query": request.message,
                 "mode": request.mode,
@@ -243,9 +258,30 @@ async def health() -> dict:
 
 @app.get("/api/v1/health")
 async def health_v1() -> dict:
-    memory = await service.call_memory("GET", "/health")
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        rag_response = await client.get(f"{RAG_SERVICE_URL}/health")
-        rag = rag_response.json()
+    memory: dict = {"status": "unavailable"}
+    rag: dict = {"status": "unavailable"}
+
+    try:
+        memory = await service.call_memory("GET", "/health")
+    except httpx.HTTPError:
+        pass
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            rag_response = await client.get(f"{RAG_SERVICE_URL}/health")
+            rag_response.raise_for_status()
+            rag = rag_response.json()
+    except httpx.HTTPError:
+        pass
+
     llm_mode = "openai_compatible" if LLM_BASE_URL else ("huggingface" if service.hf_client else "fallback")
-    return {"status": "ok", "memory": memory, "rag": rag, "llm_mode": llm_mode}
+    status = "ok" if memory.get("status") == "ok" and rag.get("status") == "ok" else "degraded"
+    return {"status": status, "memory": memory, "rag": rag, "llm_mode": llm_mode}
+
+
+@app.get("/health/ready")
+async def health_ready() -> dict:
+    data = await health_v1()
+    if data["status"] != "ok":
+        raise HTTPException(status_code=503, detail=data)
+    return data
