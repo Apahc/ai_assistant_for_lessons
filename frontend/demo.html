@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Единая база данных ИУ</title>
+  <link rel="stylesheet" href="css/demo-styles.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="main-header">
+    <div class="header-left">
+      <div class="logo">
+        <div class="logo-icon">АСЭ</div>
+        <span class="logo-text">РОСАТОМ</span>
+      </div>
+      <button class="header-btn active">Все разделы</button>
+    </div>
+    <div class="header-center">
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="Система управления" />
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="header-link">ИСМ</button>
+      <button class="header-link">Социальная поддержка</button>
+      <button class="header-link">Новому сотруднику</button>
+      <button class="header-link">Центр помощи</button>
+      <button class="header-btn-primary">Обратная связь</button>
+    </div>
+  </header>
+
+  <!-- Breadcrumbs -->
+  <div class="breadcrumbs">
+    <a href="#">Главная</a>
+    <span class="separator">›</span>
+    <a href="#">Производственная система "Росатом"</a>
+    <span class="separator">›</span>
+    <span class="current">Извлеченные уроки и улучшения</span>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <h1 class="page-title">Единая база данных ИУ</h1>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active">Общее</button>
+      <button class="tab">Единая база данных ИУ</button>
+      <button class="tab">Интерактивная карта КС</button>
+      <button class="tab">Библиотека документов</button>
+      <button class="tab">Нормативная документация</button>
+      <button class="tab">Предложить урок или улучшение</button>
+      <button class="tab">Цепочка помощи</button>
+    </div>
+
+    <!-- Search and Filter Section -->
+    <div class="search-section">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="Поиск по названию, описанию и ID" />
+      </div>
+      <div class="filter-info">
+        Уроков: <strong>728</strong>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <aside class="filters">
+      <h3>Фильтр</h3>
+      <button class="reset-btn">🔄 Сбросить все</button>
+
+      <div class="filter-group">
+        <h4>Проект</h4>
+        <label><input type="checkbox" /> АО АСЭ <span class="count">3</span></label>
+        <label><input type="checkbox" /> АО АЭП <span class="count">5</span></label>
+        <label><input type="checkbox" /> АО Атомпроект <span class="count">4</span></label>
+        <label><input type="checkbox" /> АО ИК АСЭ <span class="count">8</span></label>
+        <button class="show-more">Показать еще</button>
+      </div>
+
+      <div class="filter-group">
+        <h4>Вид деятельности</h4>
+        <label><input type="checkbox" /> Армирование <span class="count">3</span></label>
+        <label><input type="checkbox" /> Бетонирование <span class="count">9</span></label>
+        <label><input type="checkbox" /> Внедрение технологий 5С <span class="count">16</span></label>
+        <label><input type="checkbox" /> Выпуск ПД и РД <span class="count">54</span></label>
+        <button class="show-more">Показать еще</button>
+      </div>
+
+      <div class="filter-group">
+        <h4>Вид оборудования</h4>
+        <label><input type="checkbox" /> АКЗ <span class="count">1</span></label>
+        <label><input type="checkbox" /> АС КНДС <span class="count">1</span></label>
+        <label><input type="checkbox" /> Арматура <span class="count">10</span></label>
+        <label><input type="checkbox" /> Армоблок <span class="count">3</span></label>
+        <button class="show-more">Показать еще</button>
+      </div>
+
+      <div class="filter-group">
+        <h4>Этап проекта</h4>
+        <label><input type="checkbox" /> Ввод в эксплуатацию <span class="count">2</span></label>
+        <label><input type="checkbox" /> Выпуск и согласование <span class="count">10</span></label>
+        <button class="show-more">Показать еще</button>
+      </div>
+    </aside>
+
+    <!-- Lessons Cards -->
+    <div class="lessons-container">
+      <!-- Card 1 -->
+      <div class="lesson-card">
+        <div class="card-header">
+          <div class="card-id">ID: 03.01.1039</div>
+          <div class="card-status">
+            <span class="status-label">Этап:</span>
+            <span class="status-value">Проектирование стадии РД</span>
+          </div>
+        </div>
+        <h3 class="card-title">Обеспечь соблюдение участниками проекта требований Заказчика в области Политики по Культуре безопасности при подготовке документов при лицензировании и с учётом опыта другого проекта</h3>
+        <div class="card-body">
+          <div class="card-row">
+            <strong>Проект:</strong>
+            <span>АЗС ПАКШ-2</span>
+          </div>
+          <div class="card-row">
+            <strong>Процесс:</strong>
+            <span>4.12 Формирование, поддержание и развитие культуры безопасности</span>
+          </div>
+          <div class="card-row">
+            <strong>Вид деятельности:</strong>
+            <span>РД, документы, лицензии</span>
+          </div>
+          <div class="card-row">
+            <strong>Вид оборудования:</strong>
+            <span>Не оборудование</span>
+          </div>
+          <div class="card-row">
+            <strong>Ключевое событие:</strong>
+            <span>2.3 Завершение разработки проектной документации</span>
+          </div>
+          <div class="card-row">
+            <strong>Источник:</strong>
+            <span>Рекомендация для уроков от УВК8л</span>
+          </div>
+          <div class="card-row">
+            <strong>Номер в источнике:</strong>
+            <span>не требуется</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="card-badges">
+            <span class="badge">✓ Ответ эксперта</span>
+            <span class="badge">✓ Ответ об улучшении</span>
+          </div>
+          <button class="card-btn">Смотреть урок</button>
+          <button class="card-btn-secondary">📋 Заключение эксперта</button>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="lesson-card">
+        <div class="card-header">
+          <div class="card-id">ID: 03.11.1039</div>
+          <div class="card-status">
+            <span class="status-label">Этап:</span>
+            <span class="status-value">Основной период</span>
+          </div>
+        </div>
+        <h3 class="card-title">Бетонирование балок Б-1 помещений теплообменника СПОТ на энергоблоке №2 Нововоронежской АЭС-2</h3>
+        <div class="card-body">
+          <div class="card-row">
+            <strong>Проект:</strong>
+            <span>АЭС Нововоронежская-2</span>
+          </div>
+          <div class="card-row">
+            <strong>Процесс:</strong>
+            <span>3.14 Обеспечение производства. Управление производственной эффективностью</span>
+          </div>
+          <div class="card-row">
+            <strong>Вид деятельности:</strong>
+            <span>СПОТ</span>
+          </div>
+          <div class="card-row">
+            <strong>Вид оборудования:</strong>
+            <span>4.1.24 Завершение установки строительных конструкций СПОТ зданий реакторов</span>
+          </div>
+          <div class="card-row">
+            <strong>Источник:</strong>
+            <span>База данных ПСР-проектов</span>
+          </div>
+          <div class="card-row">
+            <strong>Номер в источнике:</strong>
+            <span>ПСР-75_17</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="card-badges">
+            <span class="badge">✓ Ответ об улучшении</span>
+          </div>
+          <button class="card-btn">Смотреть урок</button>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="lesson-card">
+        <div class="card-header">
+          <div class="card-id">ID: 03.11.1040</div>
+          <div class="card-status">
+            <span class="status-label">Этап:</span>
+            <span class="status-value">Основной период</span>
+          </div>
+        </div>
+        <h3 class="card-title">Оптимизация процесса изготовления ЗД в цехе МЭУ Филиала АО "НИКИМТ-Атомстрой" в НРБ на АЭС Руппур</h3>
+        <div class="card-body">
+          <div class="card-row">
+            <strong>Проект:</strong>
+            <span>АЭС Руппур</span>
+          </div>
+          <div class="card-row">
+            <strong>Процесс:</strong>
+            <span>4.18 Обеспечение качества и контроль</span>
+          </div>
+          <div class="card-row">
+            <strong>Вид деятельности:</strong>
+            <span>Управление закупками</span>
+          </div>
+          <div class="card-row">
+            <strong>Источник:</strong>
+            <span>Извлеченные уроки от УВК8и</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="card-btn">Смотреть урок</button>
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="lesson-card">
+        <div class="card-header">
+          <div class="card-id">ID: 04.12.0987</div>
+          <div class="card-status">
+            <span class="status-label">Этап:</span>
+            <span class="status-value">Проектирование</span>
+          </div>
+        </div>
+        <h3 class="card-title">Внедрение технологий 5С в производственных помещениях</h3>
+        <div class="card-body">
+          <div class="card-row">
+            <strong>Проект:</strong>
+            <span>АО АСЭ</span>
+          </div>
+          <div class="card-row">
+            <strong>Процесс:</strong>
+            <span>Производственная система</span>
+          </div>
+          <div class="card-row">
+            <strong>Вид деятельности:</strong>
+            <span>Внедрение технологий 5С</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="card-btn">Смотреть урок</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Chat Widget Button (right bottom corner) -->
+  <button class="chat-launcher" id="chatLauncher" aria-label="Открыть чат с ИИ-ассистентом" title="ИИ-ассистент">
+    💬
+  </button>
+
+  <!-- Chat Widget (from index.html) -->
+  <div class="chat-wrapper" id="chatWrapper" aria-live="polite">
+    <div class="chat-header">
+      <span class="chat-title">ИИ-ассистент</span>
+      <div class="chat-actions">
+        <button id="expandChat" class="icon-btn" aria-label="Расширить чат" title="Расширить">⤢</button>
+        <button id="closeChat" class="icon-btn" aria-label="Закрыть чат" title="Закрыть">×</button>
+      </div>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="chips" id="chipsBar">
+      Хочу предложить:
+      <button class="chip">Срыв сроков</button>
+      <button class="chip">Бетонирование</button>
+      <button class="chip">Технологии 5С</button>
+    </div>
+
+    <div class="context-buttons" id="contextButtons">
+      <button class="context-btn active" data-type="question" title="Вопрос">Вопрос</button>
+      <button class="context-btn" data-type="letter" title="Письмо">Письмо</button>
+      <button class="context-btn" data-type="document" title="Документ">Документ</button>
+    </div>
+
+    <div class="composer">
+      <input id="messageInput" type="text" placeholder="Что вы хотите найти?" />
+      <button class="send-btn" id="sendBtn" aria-label="Отправить сообщение">➤</button>
+    </div>
+  </div>
+
+  <!-- Assistant Overlay -->
+  <div class="assistant-overlay" id="assistantOverlay">
+    <div class="assistant-container">
+      <header class="assistant-header">
+        <button class="back-btn" id="assistantBack" aria-label="Вернуться к виджету">←</button>
+        <h1>ИИ-ассистент</h1>
+        <span class="assistant-date"></span>
+      </header>
+
+      <main class="assistant-main">
+        <aside class="assistant-sidebar">
+          <section class="history-panel">
+            <div class="history-title">История</div>
+            <div class="history-list" id="lessonHistory"></div>
+          </section>
+        </aside>
+
+        <section class="assistant-chat">
+          <div class="assistant-messages" id="assistantMessages"></div>
+
+          <div class="assistant-chips" id="assistantChips">
+            Хочу предложить:
+            <button class="chip">Срыв сроков</button>
+            <button class="chip">Бетонирование</button>
+            <button class="chip">Технологии 5С</button>
+          </div>
+
+          <div class="context-buttons" id="assistantContextButtons">
+            <button class="context-btn active" data-type="question" title="Вопрос">Вопрос</button>
+            <button class="context-btn" data-type="letter" title="Письмо">Письмо</button>
+            <button class="context-btn" data-type="document" title="Документ">Документ</button>
+          </div>
+
+          <div class="assistant-composer">
+            <input type="text" id="assistantInput" placeholder="Что вы хотите найти?" />
+            <button class="send-btn" id="assistantSend" aria-label="Отправить сообщение">➤</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/chat-widget.js"></script>
+</body>
+</html>

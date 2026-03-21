@@ -5,4 +5,3 @@ if [ ! -f /data/chroma/chroma.sqlite3 ] || [ ! -s /data/chroma/chroma.sqlite3 ];
 fi
 
 exec uvicorn app:app --host 0.0.0.0 --port 8001
-EOF

@@ -58,6 +58,7 @@ class ChatResponse(BaseModel):
     question: str
     context_chunks: List[LessonChunk]
     sources_count: int
+    chat_type: Optional[str] = None
 
 
 class HealthResponse(BaseModel):
