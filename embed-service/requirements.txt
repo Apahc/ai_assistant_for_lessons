@@ -1,0 +1,6 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+chromadb==0.5.3
+numpy<2.0
+onnxruntime
+pydantic>=2.8.0
