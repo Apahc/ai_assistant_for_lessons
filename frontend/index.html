@@ -3,82 +3,53 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Виджет чата ИИ-ассистента</title>
+  <title>Lessons Widget</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <button class="chat-launcher" id="chatLauncher" aria-label="Открыть чат">
-    💬
-  </button>
+  <button class="chat-launcher" id="chatLauncher" aria-label="Открыть ассистента">ИИ</button>
 
-  <div class="chat-wrapper" id="chatWrapper" aria-live="polite">
+  <div class="chat-wrapper" id="chatWrapper">
     <div class="chat-header">
-      <span class="chat-title">ИИ-ассистент</span>
+      <span>Ассистент по извлеченным урокам</span>
       <div class="chat-actions">
-        <button id="expandChat" class="icon-btn" aria-label="Расширить чат" title="Расширить">⤢</button>
-        <button id="closeChat" class="icon-btn" aria-label="Закрыть чат" title="Закрыть">×</button>
+        <button id="expandChat" class="icon-btn" title="Расширить">⤢</button>
+        <button id="closeChat" class="icon-btn" title="Закрыть">×</button>
       </div>
     </div>
-
     <div class="messages" id="messages"></div>
-
-    <div class="chips" id="chipsBar">
-      Хочу предложить
-      <button class="chip">Срыв сроков</button>
-      <button class="chip">Бетонирование</button>
-      <button class="chip">Технологии 5С</button>
+    <div class="mode-bar" id="modeBar">
+      <button class="mode-btn active" data-mode="chat">chat</button>
+      <button class="mode-btn" data-mode="search">search</button>
+      <button class="mode-btn" data-mode="document">document</button>
+      <button class="mode-btn" data-mode="mail">mail</button>
     </div>
-
-    <div class="context-buttons" id="contextButtons">
-      <button class="context-btn active" data-type="question" title="Вопрос">Вопрос</button>
-      <button class="context-btn" data-type="letter" title="Письмо">Письмо</button>
-      <button class="context-btn" data-type="document" title="Документ">Документ</button>
-    </div>
-
     <div class="composer">
-      <input id="messageInput" type="text" placeholder="Что вы хотите найти?" />
-      <button class="send-btn" id="sendBtn" aria-label="Отправить сообщение">➤</button>
+      <input id="messageInput" type="text" placeholder="Сформулируйте запрос по урокам" />
+      <button id="sendBtn" class="send-btn">➤</button>
     </div>
   </div>
 
   <div class="assistant-overlay" id="assistantOverlay">
-    <div class="assistant-container">
+    <div class="assistant-shell">
       <header class="assistant-header">
-        <button class="back-btn" id="assistantBack" aria-label="Вернуться к виджету">←</button>
-        <h1>ИИ-ассистент</h1>
-        <span class="assistant-date">11.11.2025</span>
+        <button id="assistantBack" class="icon-btn">←</button>
+        <h1>Ассистент раздела "Извлеченные уроки"</h1>
+        <span id="sessionBadge"></span>
       </header>
-
-      <main class="assistant-main">
-        <aside class="assistant-sidebar">
-          <section class="history-panel">
-            <div class="history-title">История</div>
-            <div class="history-list" id="lessonHistory"></div>
-          </section>
-        </aside>
-
-        <section class="assistant-chat">
-          <div class="assistant-messages" id="assistantMessages"></div>
-
-          <div class="assistant-chips" id="assistantChips">
-            Хочу предложить
-            <button class="chip">Срыв сроков</button>
-            <button class="chip">Бетонирование</button>
-            <button class="chip">Технологии 5С</button>
-          </div>
-
-          <div class="context-buttons" id="assistantContextButtons">
-            <button class="context-btn active" data-type="question" title="Вопрос">Вопрос</button>
-            <button class="context-btn" data-type="letter" title="Письмо">Письмо</button>
-            <button class="context-btn" data-type="document" title="Документ">Документ</button>
-          </div>
-
-          <div class="assistant-composer">
-            <input type="text" id="assistantInput" placeholder="Что вы хотите найти?" />
-            <button class="send-btn" id="assistantSend" aria-label="Отправить сообщение">➤</button>
-          </div>
-        </section>
-      </main>
+      <section class="assistant-main">
+        <div class="assistant-messages" id="assistantMessages"></div>
+        <div class="mode-bar wide" id="assistantModeBar">
+          <button class="mode-btn active" data-mode="chat">chat</button>
+          <button class="mode-btn" data-mode="search">search</button>
+          <button class="mode-btn" data-mode="document">document</button>
+          <button class="mode-btn" data-mode="mail">mail</button>
+        </div>
+        <div class="composer">
+          <input id="assistantInput" type="text" placeholder="Сформулируйте запрос по урокам" />
+          <button id="assistantSend" class="send-btn">➤</button>
+        </div>
+      </section>
     </div>
   </div>
 

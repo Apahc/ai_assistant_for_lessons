@@ -1,16 +1,11 @@
-// API Configuration
 const API_CONFIG = {
-  baseUrl: 'http://localhost:8000',
+  baseUrl: window.location.hostname === 'localhost'
+    ? 'http://localhost:8000'
+    : `${window.location.protocol}//${window.location.hostname}:8000`,
   endpoints: {
-    chat: '/api/v1/chat',
-    search: '/api/v1/search',
-    health: '/api/v1/health'
-  }
-};
-
-// Chat types
-const CHAT_TYPES = {
-  QUESTION: 'question',
-  LETTER: 'letter',
-  DOCUMENT: 'document'
+    createSession: '/api/v1/sessions',
+    closeSession: (sessionId) => `/api/v1/sessions/${sessionId}/close`,
+    respond: '/api/v1/respond',
+    health: '/api/v1/health',
+  },
 };
