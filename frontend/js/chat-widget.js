@@ -15,6 +15,7 @@ const sessionBadge = document.getElementById('sessionBadge');
 let sessionId = null;
 let currentMode = 'chat';
 let loading = false;
+let sessionBootstrapped = false;
 
 function now() {
   return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -62,10 +63,16 @@ async function ensureSession() {
   if (sessionId) return sessionId;
   const session = await apiService.createSession();
   sessionId = session.session_id;
+  sessionBootstrapped = true;
   if (sessionBadge) {
     sessionBadge.textContent = `session ${sessionId.slice(0, 8)}`;
   }
   return sessionId;
+}
+
+function seedConversation(container = messages) {
+  if (container.children.length > 0) return;
+  bubble(container, 'Ассистент работает только по разделу "Извлеченные уроки". Выберите режим и задайте запрос.', 'assistant');
 }
 
 async function sendMessage(sourceInput, targetContainer) {
@@ -127,5 +134,9 @@ window.addEventListener('beforeunload', () => {
   if (sessionId) apiService.closeSession(sessionId);
 });
 
-bubble(messages, 'Ассистент работает только по разделу "Извлеченные уроки". Выберите режим и задайте запрос.', 'assistant');
-ensureSession().catch(() => bubble(messages, 'Не удалось инициализировать диалоговую сессию.', 'assistant'));
+seedConversation(messages);
+ensureSession().catch(() => {
+  if (!sessionBootstrapped) {
+    bubble(messages, 'Не удалось инициализировать диалоговую сессию.', 'assistant');
+  }
+});

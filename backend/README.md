@@ -23,4 +23,5 @@ FastAPI orchestration-сервис.
 ## Prompts
 
 4 базовых промпта для режимов `chat`, `search`, `document`, `mail`
-встроены прямо в `backend/main.py` в словаре `PROMPT_TEMPLATES`.
+вынесены в [backend/prompts.py](/d:/ai_assistant_for_lessons/backend/prompts.py)
+и импортируются в [backend/main.py](/d:/ai_assistant_for_lessons/backend/main.py).
