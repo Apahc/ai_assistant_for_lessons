@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from typing import Literal
 
 import httpx
@@ -48,7 +50,9 @@ class RespondResponse(BaseModel):
 
 class BackendService:
     def __init__(self) -> None:
+        self.logger = logging.getLogger("backend")
         self.hf_client = None
+        self.last_llm_error: str | None = None
         if HF_TOKEN:
             try:
                 self.hf_client = InferenceClient(provider=LLM_PROVIDER, token=HF_TOKEN)
@@ -96,11 +100,85 @@ class BackendService:
             meta_context=meta_context or "Мета-контекст не найден.",
         )
 
-    def fallback_response(self, mode: Mode, context: str, results: list[dict]) -> str:
+    def normalize_generated_text(self, generated: object) -> str | None:
+        if isinstance(generated, str):
+            cleaned = generated.strip()
+            return cleaned or None
+        if isinstance(generated, list):
+            parts: list[str] = []
+            for item in generated:
+                if isinstance(item, dict):
+                    text = item.get("text")
+                    if isinstance(text, str) and text.strip():
+                        parts.append(text.strip())
+            if parts:
+                return "\n".join(parts)
+        return None
+
+    def format_lesson_brief(self, item: dict) -> str:
+        title = item.get("title", "").strip() or item.get("metadata", {}).get("lesson_id", "Урок")
+        text = " ".join((item.get("text", "") or "").split())
+        if len(text) > 320:
+            text = f"{text[:317]}..."
+        return f"{title}: {text}" if text else title
+
+    def fallback_response(
+        self,
+        mode: Mode,
+        *,
+        message: str,
+        context: str,
+        meta_context: str,
+        lesson_results: list[dict],
+    ) -> str:
+        lesson_briefs = [self.format_lesson_brief(item) for item in lesson_results[:5]]
+
         if mode == "search":
-            intro = f"По запросу найдено {len(results)} релевантных фрагментов."
-            base = "\n\n".join(item.get("text", "") for item in results[:4]).strip()
-            return f"{intro}\n\n{base or context or 'Релевантные материалы не найдены.'}"
+            if not lesson_briefs:
+                return "По запросу релевантные уроки не найдены. Уточните тему, этап проекта или вид работ."
+            intro = f"По запросу \"{message}\" найдены релевантные уроки по теме. Ниже приведены наиболее полезные материалы для дальнейшего просмотра."
+            lessons_block = "\n".join(f"{index}. {brief}" for index, brief in enumerate(lesson_briefs, start=1))
+            return f"{intro}\n\nРелевантные уроки:\n{lessons_block}"
+
+        if mode == "document":
+            evidence = "\n".join(f"- {brief}" for brief in lesson_briefs[:3]) or "- Недостаточно релевантных данных в текущем корпусе уроков."
+            return (
+                "Заголовок\n"
+                f"Черновик документа по теме: {message}\n\n"
+                "Основание\n"
+                "Подготовлено на основе материалов раздела \"Извлеченные уроки\".\n\n"
+                "Текущая ситуация\n"
+                f"{context or 'В доступном контексте недостаточно данных для развернутого описания текущей ситуации.'}\n\n"
+                "Предлагаемые меры\n"
+                f"{evidence}\n\n"
+                "Ожидаемый эффект\n"
+                "Уточнение и систематизация практик по рассматриваемой теме.\n\n"
+                "Вывод\n"
+                "Черновик требует проверки специалистом перед включением в официальный документ."
+            )
+
+        if mode == "mail":
+            evidence = "\n".join(f"- {brief}" for brief in lesson_briefs[:3]) or "- В текущем контексте релевантные уроки не найдены."
+            return (
+                "Здравствуйте!\n\n"
+                f"По теме \"{message}\" подготовлена краткая подборка материалов из раздела \"Извлеченные уроки\".\n\n"
+                "Ключевые выводы:\n"
+                f"{evidence}\n\n"
+                "Предлагаю использовать эти материалы как основу для дальнейшей проработки вопроса. "
+                "При необходимости можно дополнительно уточнить запрос по этапу проекта, виду работ или типу проблемы.\n\n"
+                "С уважением,\n"
+                "Ассистент раздела \"Извлеченные уроки\""
+            )
+
+        if lesson_briefs:
+            recommendations = "\n".join(f"- {brief}" for brief in lesson_briefs[:3])
+            return (
+                f"По материалам раздела \"Извлеченные уроки\" по теме \"{message}\" можно выделить следующие практические ориентиры:\n"
+                f"{recommendations}\n\n"
+                "Если нужно, я могу переработать это в формат поиска, документа или делового письма."
+            )
+        if meta_context:
+            return meta_context
         return context or "По запросу не найден релевантный контекст."
 
     def llm_url(self) -> str:
@@ -131,16 +209,31 @@ class BackendService:
         if not self.hf_client:
             return None
         try:
-            completion = self.hf_client.chat.completions.create(
+            completion = await asyncio.to_thread(
+                self.hf_client.chat.completions.create,
                 model=LLM_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 stream=False,
             )
-            return completion.choices[0].message.content
-        except Exception:
+            choices = getattr(completion, "choices", None) or []
+            if not choices:
+                return None
+            content = getattr(choices[0].message, "content", None)
+            return self.normalize_generated_text(content)
+        except Exception as exc:
+            self.last_llm_error = str(exc)
+            self.logger.exception("Hugging Face generation failed")
             return None
 
-    async def generate_text(self, mode: Mode, message: str, history: str, context: str, meta_context: str, results: list[dict]) -> str:
+    async def generate_text(
+        self,
+        mode: Mode,
+        message: str,
+        history: str,
+        context: str,
+        meta_context: str,
+        lesson_results: list[dict],
+    ) -> str:
         prompt = self.build_prompt(
             mode,
             message=message,
@@ -153,13 +246,24 @@ class BackendService:
         if LLM_BASE_URL:
             try:
                 generated = await self.generate_openai_compatible(prompt)
-            except httpx.HTTPError:
+            except httpx.HTTPError as exc:
+                self.last_llm_error = str(exc)
+                self.logger.exception("OpenAI-compatible generation failed")
                 generated = None
         if not generated:
             generated = await self.generate_hf(prompt)
-        if generated:
-            return generated
-        return self.fallback_response(mode, context, results)
+        normalized = self.normalize_generated_text(generated)
+        if normalized:
+            self.last_llm_error = None
+            return normalized
+        self.logger.warning("Falling back to local mode formatter for mode=%s", mode)
+        return self.fallback_response(
+            mode,
+            message=message,
+            context=context,
+            meta_context=meta_context,
+            lesson_results=lesson_results,
+        )
 
     async def handle_message(self, request: MessageRequest) -> tuple[str, int]:
         session = await self.call_memory("GET", f"/sessions/{request.session_id}")
@@ -182,6 +286,7 @@ class BackendService:
         context = retrieval.get("context", "")
         meta_context = retrieval.get("meta_context", "")
         results = retrieval.get("results", [])
+        lesson_results = retrieval.get("lesson_results", [])
 
         answer = await self.generate_text(
             request.mode,
@@ -189,7 +294,7 @@ class BackendService:
             self.history_to_text(history_messages),
             context,
             meta_context,
-            results,
+            lesson_results,
         )
 
         await self.call_memory(
@@ -276,7 +381,13 @@ async def health_v1() -> dict:
 
     llm_mode = "openai_compatible" if LLM_BASE_URL else ("huggingface" if service.hf_client else "fallback")
     status = "ok" if memory.get("status") == "ok" and rag.get("status") == "ok" else "degraded"
-    return {"status": status, "memory": memory, "rag": rag, "llm_mode": llm_mode}
+    return {
+        "status": status,
+        "memory": memory,
+        "rag": rag,
+        "llm_mode": llm_mode,
+        "llm_last_error": service.last_llm_error,
+    }
 
 
 @app.get("/health/ready")

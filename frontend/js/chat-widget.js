@@ -21,22 +21,26 @@ function now() {
   return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
+function roleLabel(role) {
+  return role === 'user' ? 'user_id' : 'assistant';
+}
+
 function escapeHtml(value) {
   return (value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
-function bubble(container, text, role = 'assistant') {
+function bubble(container, text, role = 'assistant', mode = currentMode) {
   const el = document.createElement('div');
   el.className = `bubble ${role}`;
-  el.innerHTML = `${escapeHtml(text).replaceAll('\n', '<br>')}<span class="meta">${role} • ${now()}</span>`;
+  el.innerHTML = `${escapeHtml(text).replaceAll('\n', '<br>')}<span class="meta">${roleLabel(role)} • ${now()} • ${mode}</span>`;
   container.appendChild(el);
   container.scrollTop = container.scrollHeight;
 }
 
-function loadingBubble(container) {
+function loadingBubble(container, mode = currentMode) {
   const el = document.createElement('div');
   el.className = 'bubble assistant';
-  el.innerHTML = `Идет обработка запроса...<span class="meta">${now()}</span>`;
+  el.innerHTML = `Идет обработка запроса...<span class="meta">assistant • ${now()} • ${mode}</span>`;
   container.appendChild(el);
   container.scrollTop = container.scrollHeight;
   return el;
@@ -72,7 +76,7 @@ async function ensureSession() {
 
 function seedConversation(container = messages) {
   if (container.children.length > 0) return;
-  bubble(container, 'Ассистент работает только по разделу "Извлеченные уроки". Выберите режим и задайте запрос.', 'assistant');
+  bubble(container, 'Ассистент работает только по разделу "Извлеченные уроки". Выберите режим и задайте запрос.', 'assistant', currentMode);
 }
 
 async function sendMessage(sourceInput, targetContainer) {
@@ -81,15 +85,16 @@ async function sendMessage(sourceInput, targetContainer) {
   if (!message) return;
 
   await ensureSession();
-  bubble(targetContainer, message, 'user');
+  const activeMode = currentMode;
+  bubble(targetContainer, message, 'user', activeMode);
   sourceInput.value = '';
   loading = true;
-  const loader = loadingBubble(targetContainer);
+  const loader = loadingBubble(targetContainer, activeMode);
 
   try {
-    const response = await apiService.respond(sessionId, message, currentMode);
+    const response = await apiService.respond(sessionId, message, activeMode);
     loader.remove();
-    bubble(targetContainer, response.text || response.answer || '', 'assistant');
+    bubble(targetContainer, response.text || response.answer || '', 'assistant', activeMode);
     if (targetContainer === assistantMessages) {
       syncLargeToSmall();
     } else {
@@ -97,7 +102,7 @@ async function sendMessage(sourceInput, targetContainer) {
     }
   } catch (error) {
     loader.remove();
-    bubble(targetContainer, `Ошибка: ${error.message}`, 'assistant');
+    bubble(targetContainer, `Ошибка: ${error.message}`, 'assistant', activeMode);
   } finally {
     loading = false;
   }
