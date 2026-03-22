@@ -1,37 +1,225 @@
 version: "3.9"
 
 services:
-
-  frontend:
-    build: ./frontend
-    container_name: frontend
+  # Portal shell for the lessons section.
+  portal:
+    build:
+      context: ./portal
+    env_file:
+      - .env
+    environment:
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:8081}
+      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8000}
     ports:
-      - "8080:80"
+      - "${PORTAL_PORT:-8080}:80"
+    depends_on:
+      - frontend
     restart: unless-stopped
+    networks:
+      - lessons-net
 
-  backend:
-    build: ./backend
-    container_name: backend
+  # Static widget that talks to backend API.
+  frontend:
+    build:
+      context: ./frontend
+    env_file:
+      - .env
     ports:
-      - "8000:8000"
+      - "${FRONTEND_PORT:-8081}:80"
+    restart: unless-stopped
+    networks:
+      - lessons-net
+
+  # FastAPI orchestrator.
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
     environment:
       HF_TOKEN: ${HF_TOKEN}
-    depends_on:
-      - database
-    restart: unless-stopped
-
-  database:
-    build: ./database
-    container_name: database
+      LLM_MODEL: ${LLM_MODEL}
+      LLM_PROVIDER: ${LLM_PROVIDER}
+      LLM_BASE_URL: ${LLM_BASE_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS}
+      MEMORY_SERVICE_URL: ${MEMORY_SERVICE_URL}
+      RAG_SERVICE_URL: ${RAG_SERVICE_URL}
+      RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K}
     ports:
-      - "8001:8001"
-    volumes:
-      - ./database/chroma_db:/data/chroma
-      - ./database/lessons.json:/data/lessons.json:ro
-    environment:
-      CHROMA_PERSIST_DIR: "/data/chroma"
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      memory-service:
+        condition: service_healthy
+      rag-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
+    networks:
+      - lessons-net
+
+  # Retrieval, indexing and context preparation.
+  rag-service:
+    build:
+      context: ./rag-service
+    env_file:
+      - .env
+    environment:
+      CHROMA_HOST: ${CHROMA_HOST}
+      CHROMA_PORT: ${CHROMA_INTERNAL_PORT}
+      CHROMA_COLLECTION: ${CHROMA_COLLECTION}
+      EMBED_SERVICE_URL: ${EMBED_SERVICE_URL}
+      RERANKER_SERVICE_URL: ${RERANKER_SERVICE_URL}
+      LESSONS_PATH: ${LESSONS_PATH}
+      PORTAL_META_PATH: ${PORTAL_META_PATH}
+      RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K}
+      RETRIEVAL_CANDIDATE_K: ${RETRIEVAL_CANDIDATE_K}
+    ports:
+      - "${RAG_SERVICE_PORT:-8002}:8002"
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      chroma:
+        condition: service_started
+      embed-service:
+        condition: service_healthy
+      reranker-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - lessons-net
+
+  # Embedding service. Can later be replaced by a remote API.
+  embed-service:
+    build:
+      context: ./embed-service
+    env_file:
+      - .env
+    ports:
+      - "${EMBED_SERVICE_PORT:-8003}:8003"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health/ready', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - lessons-net
+
+  # Lightweight reranker stub.
+  reranker-service:
+    build:
+      context: ./reranker-service
+    env_file:
+      - .env
+    ports:
+      - "${RERANKER_SERVICE_PORT:-8004}:8004"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - lessons-net
+
+  # Session memory + history/logging.
+  memory-service:
+    build:
+      context: ./memory-service
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: ${REDIS_URL}
+      POSTGRES_DSN: ${POSTGRES_DSN}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS}
+    ports:
+      - "${MEMORY_SERVICE_PORT:-8005}:8005"
+    depends_on:
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8005/health/ready', timeout=5).read()"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - lessons-net
+
+  # Shared vector store.
+  chroma:
+    image: chromadb/chroma:0.5.3
+    env_file:
+      - .env
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+      PERSIST_DIRECTORY: /chroma/chroma
+    ports:
+      - "${CHROMA_PORT:-8006}:8000"
+    volumes:
+      - ./data/chroma_db:/chroma/chroma
+    restart: unless-stopped
+    networks:
+      - lessons-net
+
+  # Local infrastructure services.
+  redis:
+    image: redis:7-alpine
+    env_file:
+      - .env
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - lessons-net
+
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lessons}
+      POSTGRES_USER: ${POSTGRES_USER:-lessons}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lessons}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lessons} -d ${POSTGRES_DB:-lessons}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - lessons-net
+
+volumes:
+  postgres_data:
 
 networks:
-  default:
-    name: lessons_network
+  lessons-net:
+    name: lessons-net

@@ -1,27 +1,12 @@
-"""
-Конфигурация приложения
-"""
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("hf_token", "")
+LLM_MODEL = os.getenv("LLM_MODEL") or os.getenv("LLAMA_MODEL", "meta-llama/Llama-3.3-70B-Instruct")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER") or os.getenv("LLAMA_PROVIDER", "groq")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "").strip()
+LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 
-# API Configuration
-HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("hf_token")
-LLAMA_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
-LLAMA_PROVIDER = "groq"
-
-# ChromaDB Configuration
-CHROMA_HOST = "database"
-CHROMA_PORT = "8001"
-CHROMA_COLLECTION_NAME = "lessons"
-
-# RAG Configuration
-RAG_TOP_K = 5
-RAG_CHUNK_MAX_CHARS = 1600
-RAG_CHUNK_OVERLAP = 200
-
-# API Configuration
-API_HOST = "0.0.0.0"
-API_PORT = 8000
-
+MEMORY_SERVICE_URL = os.getenv("MEMORY_SERVICE_URL", "http://memory-service:8005")
+RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service:8002")
+RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))

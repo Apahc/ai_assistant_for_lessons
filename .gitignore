@@ -1,6 +1,10 @@
-.env
 .venv
+__pycache__/
+*.pyc
 
-#database
-database/raw_data/
-database/lessons.json
+.env
+.env.example
+
+data/raw_data/
+data/lessons.json
+data/chroma_db/
