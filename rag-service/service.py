@@ -125,11 +125,15 @@ class RAGService:
         items: list[dict] = []
         for idx, item_id in enumerate(ids):
             metadata = metas[idx] if idx < len(metas) else {}
+            st = metadata.get("source_type") or "lesson"
+            if st not in ("lesson", "meta"):
+                st = "lesson"
             items.append(
                 {
                     "id": item_id,
                     "text": docs[idx] if idx < len(docs) else "",
                     "title": metadata.get("title", ""),
+                    "source_type": st,
                     "metadata": metadata,
                     "distance": distances[idx] if idx < len(distances) else None,
                 }
