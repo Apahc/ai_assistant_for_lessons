@@ -18,8 +18,63 @@ let loading = false;
 let sessionBootstrapped = false;
 
 const STORAGE_SESSION_ID = 'lessonsWidgetSessionId';
-const STORAGE_REOPEN_CHAT = 'lessonsWidgetReopenChat';
+const STORAGE_UI_LAYOUT = 'lessonsWidgetUiLayout';
 const STORAGE_RETURNING_FROM_LESSON = 'lessonsWidgetReturningFromLesson';
+const TRANSCRIPT_PREFIX = 'lessonsWidgetTranscript:';
+
+function transcriptKey(session) {
+  return TRANSCRIPT_PREFIX + session;
+}
+
+function loadTranscriptSnapshot(sid) {
+  if (!sid) return [];
+  try {
+    const raw = sessionStorage.getItem(transcriptKey(sid));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveTranscriptSnapshot(sid, entries) {
+  if (!sid || !Array.isArray(entries)) return;
+  try {
+    sessionStorage.setItem(transcriptKey(sid), JSON.stringify(entries));
+  } catch (e) {
+    /* quota */
+  }
+}
+
+function appendTranscriptTurn(sid, userText, assistantText, mode) {
+  const prev = loadTranscriptSnapshot(sid);
+  prev.push(
+    { role: 'user', content: userText, mode },
+    { role: 'assistant', content: assistantText, mode },
+  );
+  saveTranscriptSnapshot(sid, prev);
+}
+
+function mergeServerAndTranscript(serverMsgs, sid) {
+  const server = Array.isArray(serverMsgs) ? serverMsgs : [];
+  const local = loadTranscriptSnapshot(sid);
+  if (local.length > server.length) {
+    return local;
+  }
+  return server;
+}
+
+function normalizeMessageRow(m) {
+  const role = String(m.role || '')
+    .toLowerCase()
+    .trim();
+  return {
+    role,
+    content: m.content != null ? String(m.content) : '',
+    mode: m.mode || 'chat',
+  };
+}
 
 function lessonsCachePrefix(session) {
   return `lessonsWidgetLessons:${session}:`;
@@ -50,13 +105,43 @@ function clearAllWidgetStorage() {
   try {
     sessionStorage.removeItem(STORAGE_RETURNING_FROM_LESSON);
     sessionStorage.removeItem(STORAGE_SESSION_ID);
-    sessionStorage.removeItem(STORAGE_REOPEN_CHAT);
+    sessionStorage.removeItem(STORAGE_UI_LAYOUT);
     for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
       const k = sessionStorage.key(i);
-      if (k && k.startsWith('lessonsWidgetLessons:')) sessionStorage.removeItem(k);
+      if (
+        k &&
+        (k.startsWith('lessonsWidgetLessons:') || k.startsWith(TRANSCRIPT_PREFIX))
+      ) {
+        sessionStorage.removeItem(k);
+      }
     }
   } catch (e) {
     /* ignore */
+  }
+}
+
+function captureChatUiLayout() {
+  const expanded = assistantOverlay?.classList.contains('open');
+  const compactOpen = chatWrapper?.classList.contains('open');
+  if (expanded) return 'expanded';
+  if (compactOpen) return 'compact';
+  return 'closed';
+}
+
+function applyChatUiLayout(layout) {
+  const l = layout || 'compact';
+  if (l === 'expanded') {
+    chatWrapper?.classList.add('open');
+    assistantOverlay?.classList.add('open');
+    document.body.classList.add('overlay-open');
+  } else if (l === 'compact') {
+    chatWrapper?.classList.add('open');
+    assistantOverlay?.classList.remove('open');
+    document.body.classList.remove('overlay-open');
+  } else {
+    chatWrapper?.classList.remove('open');
+    assistantOverlay?.classList.remove('open');
+    document.body.classList.remove('overlay-open');
   }
 }
 
@@ -65,7 +150,7 @@ function persistStateBeforeOpeningLesson() {
   try {
     sessionStorage.setItem(STORAGE_RETURNING_FROM_LESSON, '1');
     sessionStorage.setItem(STORAGE_SESSION_ID, sessionId);
-    sessionStorage.setItem(STORAGE_REOPEN_CHAT, '1');
+    sessionStorage.setItem(STORAGE_UI_LAYOUT, captureChatUiLayout());
   } catch (e) {
     /* quota / private mode */
   }
@@ -120,17 +205,65 @@ function buildKnownLessonCodes(lessons) {
   return codes;
 }
 
+function looksLikeLessonCode(id) {
+  return /^LL\d+$/i.test(id);
+}
+
+function normalizeBracketLessonId(raw) {
+  return String(raw || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u200b-\u200d\ufeff]/g, '')
+    .trim();
+}
+
+function canonicalLlLessonId(raw) {
+  const n = normalizeBracketLessonId(raw);
+  const m = String(n).match(/^LL(\d+)$/i);
+  return m ? `LL${m[1]}` : n;
+}
+
+function shouldLinkLessonBracketId(id, knownCodes) {
+  if (knownCodes.has(id)) return true;
+  return looksLikeLessonCode(id);
+}
+
+/** Текст между ссылками в скобках: голые LL1234 (как в ответах модели без [ ]) тоже делаем ссылками. */
+function formatPlainSegmentWithBareLessonLinks(segment, known) {
+  const re = /\b(LL\d+)\b/gi;
+  let out = '';
+  let last = 0;
+  let m = re.exec(segment);
+  while (m !== null) {
+    out += escapeHtml(segment.slice(last, m.index));
+    const id = canonicalLlLessonId(m[1]);
+    if (id && shouldLinkLessonBracketId(id, known)) {
+      const href = lessonPageHref(id);
+      out += `<a class="lesson-inline-link" href="${href}">${escapeHtml(id)}</a>`;
+    } else {
+      out += escapeHtml(m[0]);
+    }
+    last = re.lastIndex;
+    m = re.exec(segment);
+  }
+  out += escapeHtml(segment.slice(last));
+  return out;
+}
+
 function formatAssistantBodyHtml(text, lessons) {
-  const cleaned = stripMarkdownAsterisks(text);
+  const cleaned = stripMarkdownAsterisks(text)
+    .replace(/\uff3b/g, '[')
+    .replace(/\uff3d/g, ']');
   const known = buildKnownLessonCodes(lessons);
   const re = /\[([A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9._-]*)\]/g;
   let result = '';
   let last = 0;
   let m = re.exec(cleaned);
   while (m !== null) {
-    result += escapeHtml(cleaned.slice(last, m.index));
-    const id = m[1];
-    if (known.has(id)) {
+    result += formatPlainSegmentWithBareLessonLinks(cleaned.slice(last, m.index), known);
+    const id = normalizeBracketLessonId(m[1]);
+    if (!id) {
+      result += escapeHtml(m[0]);
+    } else if (shouldLinkLessonBracketId(id, known)) {
       const href = lessonPageHref(id);
       result += `[<a class="lesson-inline-link" href="${href}">${escapeHtml(id)}</a>]`;
     } else {
@@ -139,7 +272,7 @@ function formatAssistantBodyHtml(text, lessons) {
     last = re.lastIndex;
     m = re.exec(cleaned);
   }
-  result += escapeHtml(cleaned.slice(last));
+  result += formatPlainSegmentWithBareLessonLinks(cleaned.slice(last), known);
   return result.replaceAll('\n', '<br>');
 }
 
@@ -173,14 +306,26 @@ function loadingBubble(container, mode = currentMode) {
   return el;
 }
 
+function scrollChatPanelsToBottom() {
+  [messages, assistantMessages].forEach((el) => {
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
+  });
+}
+
+/** После смены layout (компакт ↔ полноэкранный) высоты считаются заново — прокрутка дважды в rAF. */
+function scrollChatPanelsToBottomSoon() {
+  scrollChatPanelsToBottom();
+  requestAnimationFrame(() => {
+    scrollChatPanelsToBottom();
+    requestAnimationFrame(scrollChatPanelsToBottom);
+  });
+}
+
 function syncSmallToLarge() {
   assistantMessages.innerHTML = messages.innerHTML;
   assistantInput.value = input.value;
-}
-
-function syncLargeToSmall() {
-  messages.innerHTML = assistantMessages.innerHTML;
-  input.value = assistantInput.value;
+  scrollChatPanelsToBottom();
 }
 
 function setMode(mode) {
@@ -213,7 +358,9 @@ async function tryRestoreSessionById(saved) {
     }
     messages.innerHTML = '';
     assistantMessages.innerHTML = '';
-    const msgs = data.messages || [];
+    const rawMsgs = mergeServerAndTranscript(data.messages, sessionId);
+    const msgs = rawMsgs.map(normalizeMessageRow);
+    saveTranscriptSnapshot(sessionId, msgs);
     let lastMode = currentMode;
     let assistantTurn = 0;
     for (let i = 0; i < msgs.length; i += 1) {
@@ -222,9 +369,12 @@ async function tryRestoreSessionById(saved) {
       lastMode = mode;
       if (m.role === 'user') {
         bubble(messages, m.content, 'user', mode);
-      } else {
+      } else if (m.role === 'assistant' || m.role === 'system') {
         const cachedLessons = loadAssistantLessons(sessionId, assistantTurn);
         assistantBubble(messages, m.content, cachedLessons, mode);
+        assistantTurn += 1;
+      } else {
+        bubble(messages, m.content, 'assistant', mode);
         assistantTurn += 1;
       }
     }
@@ -234,13 +384,13 @@ async function tryRestoreSessionById(saved) {
     }
     syncSmallToLarge();
     try {
-      if (sessionStorage.getItem(STORAGE_REOPEN_CHAT) === '1') {
-        chatWrapper?.classList.add('open');
-        sessionStorage.removeItem(STORAGE_REOPEN_CHAT);
-      }
+      const layout = sessionStorage.getItem(STORAGE_UI_LAYOUT) || 'compact';
+      sessionStorage.removeItem(STORAGE_UI_LAYOUT);
+      applyChatUiLayout(layout);
     } catch (e) {
-      /* ignore */
+      chatWrapper?.classList.add('open');
     }
+    scrollChatPanelsToBottomSoon();
     return true;
   } catch (e) {
     return false;
@@ -256,7 +406,7 @@ function seedConversation(container = messages) {
   container.scrollTop = container.scrollHeight;
 }
 
-async function sendMessage(sourceInput, targetContainer) {
+async function sendMessage(sourceInput) {
   if (loading) return;
   const message = sourceInput.value.trim();
   if (!message) return;
@@ -265,51 +415,59 @@ async function sendMessage(sourceInput, targetContainer) {
 
   await ensureSession();
   const activeMode = currentMode;
-  bubble(targetContainer, message, 'user', activeMode);
-  sourceInput.value = '';
+  input.value = '';
+  assistantInput.value = '';
+
+  const panel = messages;
+  bubble(panel, message, 'user', activeMode);
   loading = true;
-  const loader = loadingBubble(targetContainer, activeMode);
+  const loader = loadingBubble(panel, activeMode);
 
   try {
     const response = await apiService.respond(sessionId, message, activeMode);
     loader.remove();
     const answerText = response.text || response.answer || '';
     const lessons = response.lessons || [];
-    assistantBubble(targetContainer, answerText, lessons, activeMode);
-    if (targetContainer === assistantMessages) {
-      syncLargeToSmall();
-    } else {
-      syncSmallToLarge();
-    }
-    const turnIndex = messages.querySelectorAll('.assistant-turn').length - 1;
+    assistantBubble(panel, answerText, lessons, activeMode);
+    syncSmallToLarge();
+    const turnIndex = panel.querySelectorAll('.assistant-turn').length - 1;
     persistAssistantLessons(sessionId, turnIndex, lessons);
+    appendTranscriptTurn(sessionId, message, answerText, activeMode);
   } catch (error) {
     loader.remove();
-    bubble(targetContainer, `Ошибка: ${error.message}`, 'assistant', activeMode);
+    bubble(panel, `Ошибка: ${error.message}`, 'assistant', activeMode);
+    syncSmallToLarge();
   } finally {
     loading = false;
   }
 }
 
-launcher?.addEventListener('click', () => chatWrapper.classList.add('open'));
+launcher?.addEventListener('click', () => {
+  chatWrapper.classList.add('open');
+  scrollChatPanelsToBottomSoon();
+});
 closeBtn?.addEventListener('click', () => chatWrapper.classList.remove('open'));
 expandBtn?.addEventListener('click', () => {
   syncSmallToLarge();
   assistantOverlay.classList.add('open');
   document.body.classList.add('overlay-open');
+  scrollChatPanelsToBottomSoon();
 });
 assistantBack?.addEventListener('click', () => {
-  syncLargeToSmall();
+  if (input && assistantInput) {
+    input.value = assistantInput.value;
+  }
   assistantOverlay.classList.remove('open');
   document.body.classList.remove('overlay-open');
+  scrollChatPanelsToBottomSoon();
 });
-sendBtn?.addEventListener('click', () => sendMessage(input, messages));
-assistantSend?.addEventListener('click', () => sendMessage(assistantInput, assistantMessages));
+sendBtn?.addEventListener('click', () => sendMessage(input));
+assistantSend?.addEventListener('click', () => sendMessage(assistantInput));
 input?.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') sendMessage(input, messages);
+  if (event.key === 'Enter') sendMessage(input);
 });
 assistantInput?.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') sendMessage(assistantInput, assistantMessages);
+  if (event.key === 'Enter') sendMessage(assistantInput);
 });
 document.querySelectorAll('.mode-bar').forEach((bar) => {
   bar.addEventListener('click', (event) => {
@@ -318,12 +476,14 @@ document.querySelectorAll('.mode-bar').forEach((bar) => {
     setMode(btn.dataset.mode);
   });
 });
-messages?.addEventListener('click', (event) => {
-  if (event.target.closest('a.lesson-inline-link')) persistStateBeforeOpeningLesson();
-});
-assistantMessages?.addEventListener('click', (event) => {
-  if (event.target.closest('a.lesson-inline-link')) persistStateBeforeOpeningLesson();
-});
+function onLessonLinkActivate(event) {
+  const a = event.target.closest('a.lesson-inline-link');
+  if (a) persistStateBeforeOpeningLesson();
+}
+messages?.addEventListener('click', onLessonLinkActivate);
+assistantMessages?.addEventListener('click', onLessonLinkActivate);
+messages?.addEventListener('auxclick', onLessonLinkActivate);
+assistantMessages?.addEventListener('auxclick', onLessonLinkActivate);
 
 async function bootstrapWidget() {
   let returningFromLesson = false;
@@ -367,6 +527,8 @@ async function bootstrapWidget() {
       bubble(messages, 'Не удалось инициализировать диалоговую сессию.', 'assistant');
     }
   }
+  syncSmallToLarge();
+  scrollChatPanelsToBottomSoon();
 }
 
 bootstrapWidget();

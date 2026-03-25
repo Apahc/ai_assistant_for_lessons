@@ -209,31 +209,31 @@ def load_messages_from_postgres(session_id: str) -> list[dict[str, Any]]:
 
 
 def load_messages(session_id: str) -> tuple[list[dict[str, Any]], str]:
-    raw_messages = redis_client.lrange(redis_messages_key(session_id), 0, -1)
+    """Postgres is the source of truth. Redis is a cache; resync if lengths diverge."""
+    rows = load_messages_from_postgres(session_id)
+    redis_key = redis_messages_key(session_id)
+    formatted = [
+        {
+            "role": row["role"],
+            "content": row["content"],
+            "mode": row["mode"],
+            "created_at": iso_ts(row["created_at"]),
+        }
+        for row in rows
+    ]
+
+    if formatted:
+        if redis_client.llen(redis_key) != len(formatted):
+            redis_client.delete(redis_key)
+            for item in formatted:
+                redis_client.rpush(redis_key, json.dumps(item, ensure_ascii=False))
+        touch_redis_session(session_id)
+        return formatted, "postgres"
+
+    raw_messages = redis_client.lrange(redis_key, 0, -1)
     if raw_messages:
         touch_redis_session(session_id)
         return [json.loads(item) for item in raw_messages], "redis"
-
-    rows = load_messages_from_postgres(session_id)
-    if rows:
-        for row in rows:
-            payload = {
-                "role": row["role"],
-                "content": row["content"],
-                "mode": row["mode"],
-                "created_at": iso_ts(row["created_at"]),
-            }
-            redis_client.rpush(redis_messages_key(session_id), json.dumps(payload, ensure_ascii=False))
-        touch_redis_session(session_id)
-        return [
-            {
-                "role": row["role"],
-                "content": row["content"],
-                "mode": row["mode"],
-                "created_at": iso_ts(row["created_at"]),
-            }
-            for row in rows
-        ], "postgres"
     return [], "empty"
 
 
@@ -257,16 +257,6 @@ def append_message(session_id: str, role: str, content: str, mode: str) -> Sessi
         "created_at": iso_ts(created_at),
     }
 
-    redis_client.rpush(redis_messages_key(session_id), json.dumps(payload, ensure_ascii=False))
-    redis_client.hset(
-        redis_meta_key(session_id),
-        mapping={
-            "status": "active",
-            "updated_at": payload["created_at"],
-        },
-    )
-    touch_redis_session(session_id)
-
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -285,6 +275,19 @@ def append_message(session_id: str, role: str, content: str, mode: str) -> Sessi
                 (created_at, "active", session_id),
             )
         conn.commit()
+
+    try:
+        redis_client.rpush(redis_messages_key(session_id), json.dumps(payload, ensure_ascii=False))
+        redis_client.hset(
+            redis_meta_key(session_id),
+            mapping={
+                "status": "active",
+                "updated_at": payload["created_at"],
+            },
+        )
+        touch_redis_session(session_id)
+    except redis.exceptions.RedisError:
+        pass
 
     return SessionResponse(session_id=session_id, status="active")
 
