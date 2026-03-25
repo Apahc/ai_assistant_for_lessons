@@ -46,6 +46,9 @@ services:
       MEMORY_SERVICE_URL: ${MEMORY_SERVICE_URL}
       RAG_SERVICE_URL: ${RAG_SERVICE_URL}
       RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K}
+      LESSONS_PATH: ${LESSONS_PATH:-/data/lessons.json}
+    volumes:
+      - ./data:/data:ro
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:

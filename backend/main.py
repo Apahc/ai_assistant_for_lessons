@@ -1,6 +1,9 @@
 import asyncio
+import json
 import logging
-from typing import Literal
+import re
+from pathlib import Path
+from typing import Any, Literal
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -10,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from config import (
     HF_TOKEN,
+    LESSONS_PATH,
     LLM_API_KEY,
     LLM_BASE_URL,
     LLM_MODEL,
@@ -20,6 +24,19 @@ from config import (
     RETRIEVAL_TOP_K,
 )
 from prompts import PROMPT_TEMPLATES
+
+
+def strip_markdown_asterisks(text: str) -> str:
+    if not text:
+        return text
+    s = text
+    while "**" in s:
+        s_new = re.sub(r"\*\*([^*]+?)\*\*", r"\1", s, count=1)
+        if s_new == s:
+            break
+        s = s_new
+    s = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", s)
+    return s.replace("*", "")
 
 
 Mode = Literal["chat", "search", "document", "mail"]
@@ -37,8 +54,16 @@ class MessageRequest(BaseModel):
     top_k: int = Field(default=RETRIEVAL_TOP_K, ge=1, le=20)
 
 
+class LessonSnippet(BaseModel):
+    id: str
+    title: str
+    text: str
+    lesson_id: str | None = None
+
+
 class MessageResponse(BaseModel):
     text: str
+    lessons: list[LessonSnippet] = Field(default_factory=list)
 
 
 class RespondResponse(BaseModel):
@@ -46,6 +71,7 @@ class RespondResponse(BaseModel):
     mode: Mode
     answer: str
     results_count: int
+    lessons: list[LessonSnippet] = Field(default_factory=list)
 
 
 class BackendService:
@@ -53,6 +79,8 @@ class BackendService:
         self.logger = logging.getLogger("backend")
         self.hf_client = None
         self.last_llm_error: str | None = None
+        self._lessons_by_id: dict[str, dict[str, Any]] | None = None
+        self._lessons_index_file: str | None = None
         if HF_TOKEN:
             try:
                 self.hf_client = InferenceClient(provider=LLM_PROVIDER, token=HF_TOKEN)
@@ -265,7 +293,63 @@ class BackendService:
             lesson_results=lesson_results,
         )
 
-    async def handle_message(self, request: MessageRequest) -> tuple[str, int]:
+    def _ensure_lessons_index(self) -> dict[str, dict[str, Any]]:
+        if not LESSONS_PATH:
+            return {}
+        path = Path(LESSONS_PATH)
+        try:
+            resolved = str(path.resolve())
+        except OSError:
+            resolved = LESSONS_PATH
+        if self._lessons_by_id is not None and self._lessons_index_file == resolved:
+            return self._lessons_by_id
+        if not path.is_file():
+            self.logger.warning("LESSONS_PATH is not a readable file: %s", LESSONS_PATH)
+            self._lessons_by_id = {}
+            self._lessons_index_file = resolved
+            return self._lessons_by_id
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        idx: dict[str, dict[str, Any]] = {}
+        if isinstance(raw, list):
+            for item in raw:
+                if not isinstance(item, dict):
+                    continue
+                lid = str(item.get("ID_урока") or item.get("lesson_id") or item.get("id") or "").strip()
+                if lid:
+                    idx[lid] = dict(item)
+        self._lessons_by_id = idx
+        self._lessons_index_file = resolved
+        return self._lessons_by_id
+
+    def get_full_lesson(self, lesson_id: str) -> dict[str, Any] | None:
+        lid = lesson_id.strip()
+        if not lid:
+            return None
+        return self._ensure_lessons_index().get(lid)
+
+    def lesson_snippets_from_results(self, lesson_results: list[dict]) -> list[LessonSnippet]:
+        seen: set[str] = set()
+        out: list[LessonSnippet] = []
+        for item in lesson_results:
+            if item.get("source_type") != "lesson":
+                continue
+            chunk_id = str(item.get("id", ""))
+            if not chunk_id or chunk_id in seen:
+                continue
+            seen.add(chunk_id)
+            meta = item.get("metadata") or {}
+            title = (item.get("title") or "").strip() or str(meta.get("lesson_id") or "Урок")
+            out.append(
+                LessonSnippet(
+                    id=chunk_id,
+                    title=title,
+                    text=item.get("text") or "",
+                    lesson_id=meta.get("lesson_id"),
+                )
+            )
+        return out
+
+    async def handle_message(self, request: MessageRequest) -> tuple[str, int, list[LessonSnippet]]:
         session = await self.call_memory("GET", f"/sessions/{request.session_id}")
         history_messages = session.get("messages", [])
 
@@ -296,13 +380,15 @@ class BackendService:
             meta_context,
             lesson_results,
         )
+        answer = strip_markdown_asterisks(answer)
 
         await self.call_memory(
             "POST",
             f"/sessions/{request.session_id}/messages",
             {"role": "assistant", "content": answer, "mode": request.mode},
         )
-        return answer, len(results)
+        snippets = self.lesson_snippets_from_results(lesson_results)
+        return answer, len(results), snippets
 
 
 service = BackendService()
@@ -333,11 +419,34 @@ async def close_session(session_id: str) -> SessionResponse:
     return SessionResponse(**data)
 
 
+@app.get("/api/v1/lessons/{lesson_id}")
+async def get_lesson_full(lesson_id: str) -> dict[str, Any]:
+    row = service.get_full_lesson(lesson_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    return row
+
+
+@app.get("/api/v1/sessions/{session_id}")
+async def get_session_state(session_id: str) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{MEMORY_SERVICE_URL.rstrip('/')}/sessions/{session_id}")
+            if response.status_code == 404:
+                raise HTTPException(status_code=404, detail="Session not found")
+            response.raise_for_status()
+            return response.json()
+    except HTTPException:
+        raise
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Downstream service error: {exc}") from exc
+
+
 @app.post("/message", response_model=MessageResponse)
 async def message(request: MessageRequest) -> MessageResponse:
     try:
-        answer, _ = await service.handle_message(request)
-        return MessageResponse(text=answer)
+        answer, _, lessons = await service.handle_message(request)
+        return MessageResponse(text=answer, lessons=lessons)
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Downstream service error: {exc}") from exc
 
@@ -345,12 +454,13 @@ async def message(request: MessageRequest) -> MessageResponse:
 @app.post("/api/v1/respond", response_model=RespondResponse)
 async def respond(request: MessageRequest) -> RespondResponse:
     try:
-        answer, results_count = await service.handle_message(request)
+        answer, results_count, lessons = await service.handle_message(request)
         return RespondResponse(
             session_id=request.session_id,
             mode=request.mode,
             answer=answer,
             results_count=results_count,
+            lessons=lessons,
         )
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Downstream service error: {exc}") from exc

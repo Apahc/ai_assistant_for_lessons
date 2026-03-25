@@ -9,6 +9,13 @@ class APIService {
     return response.json();
   }
 
+  async getSession(sessionId) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.endpoints.getSession(sessionId)}`);
+    if (response.status === 404) throw new Error('Session not found');
+    if (!response.ok) throw new Error('Не удалось загрузить сессию');
+    return response.json();
+  }
+
   async respond(sessionId, message, mode) {
     const response = await fetch(`${this.baseUrl}${API_CONFIG.endpoints.message}`, {
       method: 'POST',

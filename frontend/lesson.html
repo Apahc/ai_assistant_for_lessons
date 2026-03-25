@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Урок</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="lesson-page">
+  <p class="lesson-page-nav"><a href="#" id="lessonBackLink">← Назад к чату</a></p>
+  <article class="lesson-page-article" id="lessonArticle">
+    <p class="lesson-page-kicker" id="lessonKicker">Карточка урока</p>
+    <h1 id="lessonTitle">Урок</h1>
+    <p class="lesson-page-error" id="lessonError" hidden></p>
+    <div id="lessonFieldsWrap" class="lesson-page-fields-wrap" hidden>
+      <h2 class="lesson-page-section-title">Все поля</h2>
+      <dl class="lesson-page-fields" id="lessonFields"></dl>
+    </div>
+    <section class="lesson-page-section lesson-page-legacy" id="legacySection" hidden>
+      <h2 class="lesson-page-section-title">Фрагмент (старая ссылка)</h2>
+      <div id="lessonBody" class="lesson-page-body"></div>
+    </section>
+  </article>
+  <script src="js/config.js"></script>
+  <script>
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    }
+
+    function formatFieldValue(v) {
+      if (v === null || v === undefined) return '—';
+      if (typeof v === 'boolean') return v ? 'Да' : 'Нет';
+      return String(v);
+    }
+
+    var FIELD_ORDER = [
+      'ID_урока', 'Наименование_урока', 'Дата_урока',
+      'Проект_организация', 'Этап_Проекта', 'Функциональный_процесс',
+      'Вид_деятельности', 'Стадия_ЖЦ', 'Вид_оборудования', 'Ключевое_событие',
+      'Источник_урока', 'Номер_в_источнике', 'Значимость_урока',
+      'Направлено_в_УВКиМ', 'Протокол_рассмотрения', 'Отчет_об_улучшении',
+      'Отчет_об_использовании', 'Ответ_эксперта', 'Информационный_листок',
+      'Заключение_эксперта', 'Материалы',
+      'Описание_проблема', 'Описание_решение', 'Описание_результат'
+    ];
+
+    function orderedKeys(obj) {
+      var keys = Object.keys(obj);
+      var ordered = [];
+      FIELD_ORDER.forEach(function (k) {
+        if (keys.indexOf(k) !== -1) ordered.push(k);
+      });
+      keys
+        .filter(function (k) { return FIELD_ORDER.indexOf(k) === -1; })
+        .sort(function (a, b) { return a.localeCompare(b, 'ru'); })
+        .forEach(function (k) { ordered.push(k); });
+      return ordered;
+    }
+
+    function renderRecord(record) {
+      var dl = document.getElementById('lessonFields');
+      var wrap = document.getElementById('lessonFieldsWrap');
+      dl.innerHTML = '';
+      orderedKeys(record).forEach(function (key) {
+        var dt = document.createElement('dt');
+        dt.className = 'lesson-page-dt';
+        dt.textContent = key;
+        var dd = document.createElement('dd');
+        dd.className = 'lesson-page-dd';
+        var val = formatFieldValue(record[key]);
+        if (val.length > 200 || val.indexOf('\n') !== -1) {
+          dd.classList.add('lesson-page-dd--block');
+        }
+        dd.textContent = val;
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      });
+      wrap.hidden = false;
+    }
+
+    function capitalizeFirstLetter(str) {
+      if (!str) return str;
+      var c = str.charAt(0);
+      if (!/[a-zа-яё]/.test(c)) return str;
+      return c.toLocaleUpperCase('ru-RU') + str.slice(1);
+    }
+
+    function showError(msg) {
+      var el = document.getElementById('lessonError');
+      el.textContent = msg;
+      el.hidden = false;
+    }
+
+    document.getElementById('lessonBackLink').addEventListener('click', function (e) {
+      e.preventDefault();
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = 'demo.html';
+      }
+    });
+
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var lessonId = params.get('lessonId');
+      var backendUrl = (params.get('backendUrl') || (typeof API_CONFIG !== 'undefined' && API_CONFIG.baseUrl) || '').replace(/\/$/, '');
+      var titleEl = document.getElementById('lessonTitle');
+
+      if (lessonId && backendUrl) {
+        titleEl.textContent = 'Загрузка…';
+        var url = backendUrl + '/api/v1/lessons/' + encodeURIComponent(lessonId);
+        fetch(url)
+          .then(function (r) {
+            if (r.status === 404) throw new Error('Урок не найден в базе.');
+            if (!r.ok) throw new Error('Не удалось загрузить карточку (' + r.status + ').');
+            return r.json();
+          })
+          .then(function (record) {
+            var name = record['Наименование_урока'] || record['Наименование'] || lessonId;
+            titleEl.textContent = name;
+            document.title = name;
+            renderRecord(record);
+          })
+          .catch(function (err) {
+            titleEl.textContent = 'Урок';
+            showError(err.message || 'Ошибка загрузки.');
+          });
+        return;
+      }
+
+      var raw = window.location.hash.slice(1);
+      if (!raw) {
+        titleEl.textContent = 'Урок';
+        showError('Откройте урок по ссылке из чата ассистента.');
+        return;
+      }
+      try {
+        var json = decodeURIComponent(escape(window.atob(raw)));
+        var data = JSON.parse(json);
+        titleEl.textContent = (data.title && String(data.title)) || 'Урок';
+        document.title = titleEl.textContent;
+        var bodyEl = document.getElementById('lessonBody');
+        var leg = document.getElementById('legacySection');
+        var bodyText = (data.text && String(data.text)) || '';
+        bodyEl.textContent = bodyText ? capitalizeFirstLetter(bodyText.trim()) : 'Нет текста фрагмента.';
+        leg.hidden = false;
+        showError('Это старая ссылка. Откройте урок снова из чата, чтобы увидеть полную карточку.');
+      } catch (err) {
+        titleEl.textContent = 'Не удалось открыть урок';
+        showError('Ссылка устарела или повреждена.');
+      }
+    })();
+  </script>
+</body>
+</html>
