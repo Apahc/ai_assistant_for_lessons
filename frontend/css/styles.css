@@ -204,6 +204,148 @@ body.overlay-open {
   font-size: 20px;
 }
 
+.bubble .lesson-inline-link {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.bubble .lesson-inline-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+body.lesson-page {
+  margin: 0;
+  min-height: 100vh;
+  padding: 24px 20px 48px;
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
+  background: var(--bg);
+}
+
+.lesson-page-nav {
+  margin: 0 0 20px;
+}
+
+.lesson-page-nav a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.lesson-page-nav a:hover {
+  text-decoration: underline;
+}
+
+.lesson-page-article {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px 28px 32px;
+  box-shadow: 0 4px 24px rgba(7, 23, 34, 0.06);
+}
+
+.lesson-page-kicker {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lesson-page-article > h1 {
+  margin: 0 0 12px;
+  font-size: clamp(1.25rem, 2.5vw, 1.625rem);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.lesson-page-error {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fff4e5;
+  border: 1px solid #e8c48a;
+  color: #5c3d0a;
+  font-size: 0.9375rem;
+}
+
+.lesson-page-fields-wrap {
+  margin-top: 8px;
+}
+
+.lesson-page-section-title {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lesson-page-fields {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(140px, 280px) 1fr;
+  gap: 8px 20px;
+  font-size: 0.9375rem;
+}
+
+.lesson-page-dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--muted);
+  padding-top: 4px;
+}
+
+.lesson-page-dd {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.lesson-page-dd--block {
+  white-space: pre-wrap;
+}
+
+@media (max-width: 640px) {
+  .lesson-page-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .lesson-page-dt {
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .lesson-page-fields .lesson-page-dt:first-of-type {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+.lesson-page-section {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.lesson-page-legacy .lesson-page-body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.lesson-page-section--empty .lesson-page-section-title {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .assistant-shell {
     min-width: auto;

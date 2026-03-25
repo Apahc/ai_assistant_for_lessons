@@ -10,3 +10,5 @@ LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 MEMORY_SERVICE_URL = os.getenv("MEMORY_SERVICE_URL", "http://memory-service:8005")
 RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service:8002")
 RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
+
+LESSONS_PATH = os.getenv("LESSONS_PATH", "/data/lessons.json").strip()
