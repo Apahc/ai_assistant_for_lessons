@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any, Literal
 
@@ -10,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from huggingface_hub import InferenceClient
 from pydantic import BaseModel, Field
+from prompts import PROMPT_TEMPLATES, SYSTEM_PROMPT
 
 from config import (
     HF_TOKEN,
@@ -23,21 +25,124 @@ from config import (
     RAG_SERVICE_URL,
     RETRIEVAL_TOP_K,
 )
-from prompts import PROMPT_TEMPLATES
+
+# ---------------------------------------------------------------------------
+#  Многослойный фильтр иностранных символов
+# ---------------------------------------------------------------------------
+
+# Слой 2: Промпт для LLM fix-up прохода
+FIXUP_PROMPT = """Ниже приведён текст, в котором МОГУТ встречаться слова на иностранных языках
+(китайский, испанский, английский и др.), смешанные с русским текстом.
+
+ЗАДАЧА: замени каждое иностранное слово или фрагмент его ТОЧНЫМ русским эквивалентом,
+сохраняя падеж, число и смысл предложения. НЕ УДАЛЯЙ информацию. НЕ ДОБАВЛЯЙ ничего нового.
+Верни ТОЛЬКО исправленный текст, без пояснений и комментариев.
+
+Текст для исправления:
+{text}"""
 
 
-def strip_markdown_asterisks(text: str) -> str:
+# ---------- Слой 1: Детектор иностранного контента ----------
+
+# Диапазоны Unicode для нежелательных скриптов
+_FOREIGN_RANGES = (
+    ("\u2E80", "\u9FFF"),   # CJK (китайский, японский, корейский)
+    ("\uAC00", "\uD7AF"),   # Хангыль (корейский)
+    ("\uF900", "\uFAFF"),   # CJK совместимые иероглифы
+    ("\u0600", "\u06FF"),   # Арабский
+    ("\u0900", "\u097F"),   # Деванагари
+    ("\u0E00", "\u0E7F"),   # Тайский
+)
+
+# Паттерн: слово, содержащее хотя бы одну латинскую букву, склеенное
+# с кириллическими суффиксами/окончаниями (например "uniformных", "desarrollать")
+_HYBRID_WORD_RE = re.compile(
+    r'\b[a-zA-Z]{3,}[а-яёА-ЯЁ]+\b'   # латинский корень + кириллическое окончание
+    r'|'
+    r'\b[а-яёА-ЯЁ]+[a-zA-Z]{3,}\b',  # кириллическое начало + латинский хвост
+    re.UNICODE,
+)
+
+# Чистые латинские слова длиной ≥ 4 (не аббревиатуры, не ID)
+_PURE_LATIN_WORD_RE = re.compile(
+    r'(?<![A-Za-z0-9_/\\])\b[a-zA-Z]{4,}\b(?![A-Za-z0-9_/\\])',
+    re.UNICODE,
+)
+
+# Допустимые латинские слова (аббревиатуры, термины, ID)
+_ALLOWED_LATIN = {
+    "id", "ll", "uc", "http", "https", "url", "api", "json", "xml",
+    "pdf", "doc", "docx", "xlsx", "csv", "html", "email", "smtp",
+    "iaea", "wano", "rosatom", "iso", "gost", "snip", "meta",
+    "chat", "search", "document", "mail", "ok", "null", "none",
+    "true", "false", "etc", "vs",
+}
+
+
+def has_foreign_content(text: str) -> bool:
+    """Слой 1: обнаруживает иностранные символы и гибридные слова."""
+    # Проверка CJK / арабских / прочих нежелательных скриптов
+    for char in text:
+        for lo, hi in _FOREIGN_RANGES:
+            if lo <= char <= hi:
+                return True
+
+    # Проверка гибридных слов (латиница+кириллица)
+    if _HYBRID_WORD_RE.search(text):
+        return True
+
+    # Проверка чистых латинских слов (не аббревиатур)
+    for match in _PURE_LATIN_WORD_RE.finditer(text):
+        word = match.group().lower()
+        if word not in _ALLOWED_LATIN and not word.startswith("ll"):
+            return True
+
+    return False
+
+# ---------- Слой 3: Regex safety net ----------
+
+def strip_remaining_foreign(text: str) -> str:
+    """Слой 3: финальная зачистка — убирает оставшиеся нежелательные символы."""
     if not text:
         return text
-    s = text
-    while "**" in s:
-        s_new = re.sub(r"\*\*([^*]+?)\*\*", r"\1", s, count=1)
-        if s_new == s:
-            break
-        s = s_new
-    s = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", s)
-    return s.replace("*", "")
 
+    # Убрать CJK и прочие нежелательные скрипты
+    cleaned = re.sub(
+        r'[\u2E80-\u9FFF'       # CJK Unified
+        r'\uAC00-\uD7AF'        # Хангыль
+        r'\uF900-\uFAFF'        # CJK Compatibility
+        r'\u0600-\u06FF'        # Арабский
+        r'\u0900-\u097F'        # Деванагари
+        r'\u0E00-\u0E7F'        # Тайский
+        r'\U00020000-\U0002A6DF'  # CJK Extension B
+        r'\U0002A700-\U0002B73F'  # CJK Extension C
+        r']+',
+        '',
+        text,
+    )
+
+    # Убрать гибридные слова (латинский корень + кириллическое окончание)
+    cleaned = _HYBRID_WORD_RE.sub('', cleaned)
+
+    # Убрать markdown ** и *
+    while "**" in cleaned:
+        new = re.sub(r"\*\*([^*]+?)\*\*", r"\1", cleaned, count=1)
+        if new == cleaned:
+            break
+        cleaned = new
+    cleaned = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", cleaned)
+    cleaned = cleaned.replace("*", "")
+
+    # Убрать двойные пробелы и лишние пустые строки
+    cleaned = re.sub(r'  +', ' ', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+
+    return cleaned.strip()
+
+
+# ---------------------------------------------------------------------------
+#  Конец блока фильтра
+# ---------------------------------------------------------------------------
 
 Mode = Literal["chat", "search", "document", "mail"]
 
@@ -221,7 +326,10 @@ class BackendService:
             headers["Authorization"] = f"Bearer {LLM_API_KEY}"
         payload = {
             "model": LLM_MODEL,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
             "stream": False,
         }
         async with httpx.AsyncClient(timeout=LLM_TIMEOUT_SECONDS) as client:
@@ -240,7 +348,10 @@ class BackendService:
             completion = await asyncio.to_thread(
                 self.hf_client.chat.completions.create,
                 model=LLM_MODEL,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
                 stream=False,
             )
             choices = getattr(completion, "choices", None) or []
@@ -251,6 +362,20 @@ class BackendService:
         except Exception as exc:
             self.last_llm_error = str(exc)
             self.logger.exception("Hugging Face generation failed")
+            return None
+
+    async def _llm_fixup(self, dirty_text: str) -> str | None:
+        """Слой 2: отправляет текст на повторный LLM-проход для замены иностранных слов."""
+        fixup = FIXUP_PROMPT.format(text=dirty_text)
+        try:
+            if LLM_BASE_URL:
+                result = await self.generate_openai_compatible(fixup)
+                if result:
+                    return result
+            result = await self.generate_hf(fixup)
+            return result
+        except Exception as exc:
+            self.logger.warning("LLM fixup pass failed: %s", exc)
             return None
 
     async def generate_text(
@@ -280,18 +405,48 @@ class BackendService:
                 generated = None
         if not generated:
             generated = await self.generate_hf(prompt)
+
         normalized = self.normalize_generated_text(generated)
-        if normalized:
-            self.last_llm_error = None
-            return normalized
-        self.logger.warning("Falling back to local mode formatter for mode=%s", mode)
-        return self.fallback_response(
-            mode,
-            message=message,
-            context=context,
-            meta_context=meta_context,
-            lesson_results=lesson_results,
-        )
+        if not normalized:
+            self.logger.warning("Falling back to local mode formatter for mode=%s", mode)
+            return self.fallback_response(
+                mode,
+                message=message,
+                context=context,
+                meta_context=meta_context,
+                lesson_results=lesson_results,
+            )
+
+        self.last_llm_error = None
+
+        # ===== Многослойный фильтр =====
+
+        # Слой 1: Детекция — есть ли иностранный контент?
+        if not has_foreign_content(normalized):
+            # Чисто — только markdown-очистка
+            return strip_remaining_foreign(normalized)
+
+        self.logger.info("Foreign content detected, applying multi-layer filter")
+
+        # Если после словаря всё чисто — готово
+        if not has_foreign_content(normalized):
+            self.logger.info("Layer 2 (dictionary) resolved all foreign content")
+            return strip_remaining_foreign(normalized)
+
+        # Слой 2: LLM fix-up проход
+        fixup_result = await self._llm_fixup(normalized)
+        if fixup_result:
+            fixup_normalized = self.normalize_generated_text(fixup_result)
+            if fixup_normalized and not has_foreign_content(fixup_normalized):
+                self.logger.info("Layer 3 (LLM fixup) resolved all foreign content")
+                return strip_remaining_foreign(fixup_normalized)
+            # Даже если fix-up не полностью очистил — берём его результат как базу
+            if fixup_normalized:
+                normalized = fixup_normalized
+
+        # Слой 3: Regex safety net — жёсткая зачистка оставшегося
+        self.logger.info("Layer 4 (regex safety net) applied")
+        return strip_remaining_foreign(normalized)
 
     def _ensure_lessons_index(self) -> dict[str, dict[str, Any]]:
         if not LESSONS_PATH:
@@ -380,7 +535,6 @@ class BackendService:
             meta_context,
             lesson_results,
         )
-        answer = strip_markdown_asterisks(answer)
 
         await self.call_memory(
             "POST",
@@ -392,7 +546,7 @@ class BackendService:
 
 
 service = BackendService()
-app = FastAPI(title="Lessons Backend", version="2.2.0")
+app = FastAPI(title="Lessons Backend", version="2.3.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
