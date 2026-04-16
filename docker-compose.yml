@@ -47,6 +47,7 @@ services:
       RAG_SERVICE_URL: ${RAG_SERVICE_URL}
       RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K}
       LESSONS_PATH: ${LESSONS_PATH:-/data/lessons.json}
+      GLOSSARY_PATH: ${GLOSSARY_PATH:-/data/glossary.json}
     volumes:
       - ./data:/data:ro
     ports:
@@ -84,7 +85,6 @@ services:
       INFORMATION_SHEETS_PATH: ${INFORMATION_SHEETS_PATH:-/data/information_sheets.json}
       LETTERS_PATH: ${LETTERS_PATH:-/data/letters.json}
       GLOSSARY_PATH: ${GLOSSARY_PATH:-/data/glossary.json}
-      RAG_FORCE_REINDEX: ${RAG_FORCE_REINDEX:-0}
       RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K}
       RETRIEVAL_CANDIDATE_K: ${RETRIEVAL_CANDIDATE_K}
     ports:
@@ -112,8 +112,12 @@ services:
   embed-service:
     build:
       context: ./embed-service
+      args:
+        EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
     env_file:
       - .env
+    environment:
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
     ports:
       - "${EMBED_SERVICE_PORT:-8003}:8003"
     healthcheck:
