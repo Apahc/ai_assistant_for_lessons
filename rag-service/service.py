@@ -15,7 +15,6 @@ from config import (
     MAX_CHARS,
     OVERLAP,
     PORTAL_META_PATH,
-    RAG_FORCE_REINDEX,
     REPORTS_PATH,
     RETRIEVAL_CANDIDATE_K,
     RERANKER_SERVICE_URL,
@@ -65,18 +64,6 @@ class RAGService:
     async def ensure_index(self) -> None:
         if self.lessons_collection is None or self.meta_collection is None:
             return
-
-        if RAG_FORCE_REINDEX:
-            try:
-                self.client.delete_collection(CHROMA_COLLECTION)
-            except Exception:
-                pass
-            try:
-                self.client.delete_collection(f"{CHROMA_COLLECTION}_meta")
-            except Exception:
-                pass
-            self.lessons_collection = self.client.get_or_create_collection(name=CHROMA_COLLECTION)
-            self.meta_collection = self.client.get_or_create_collection(name=f"{CHROMA_COLLECTION}_meta")
 
         if self.lessons_collection.count() == 0:
             await self._index_documents(self.lessons_collection, self.loader.load_lessons_corpus())

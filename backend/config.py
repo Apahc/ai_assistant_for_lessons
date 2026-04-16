@@ -12,3 +12,4 @@ RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service:8002")
 RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
 
 LESSONS_PATH = os.getenv("LESSONS_PATH", "/data/lessons.json").strip()
+GLOSSARY_PATH = os.getenv("GLOSSARY_PATH", "/data/glossary.json").strip()

@@ -11,9 +11,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from huggingface_hub import InferenceClient
 from pydantic import BaseModel, Field
+from glossary_terms import mentioned_glossary_entries, prepend_glossary_block
 from prompts import PROMPT_TEMPLATES, SYSTEM_PROMPT
 
 from config import (
+    GLOSSARY_PATH,
     HF_TOKEN,
     LESSONS_PATH,
     LLM_API_KEY,
@@ -523,6 +525,9 @@ class BackendService:
             }
         )
         context = retrieval.get("context", "")
+        glossary_hits = mentioned_glossary_entries(request.message, GLOSSARY_PATH)
+        if glossary_hits:
+            context = prepend_glossary_block(context, glossary_hits)
         meta_context = retrieval.get("meta_context", "")
         results = retrieval.get("results", [])
         lesson_results = retrieval.get("lesson_results", [])
