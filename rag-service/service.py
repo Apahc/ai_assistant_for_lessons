@@ -8,10 +8,15 @@ from config import (
     CHROMA_HOST,
     CHROMA_PORT,
     EMBED_SERVICE_URL,
+    GLOSSARY_PATH,
+    INFORMATION_SHEETS_PATH,
     LESSONS_PATH,
+    LETTERS_PATH,
     MAX_CHARS,
     OVERLAP,
     PORTAL_META_PATH,
+    RAG_FORCE_REINDEX,
+    REPORTS_PATH,
     RETRIEVAL_CANDIDATE_K,
     RERANKER_SERVICE_URL,
 )
@@ -25,7 +30,14 @@ class RAGService:
         self.client = None
         self.lessons_collection = None
         self.meta_collection = None
-        self.loader = DataLoader(LESSONS_PATH, PORTAL_META_PATH)
+        self.loader = DataLoader(
+            LESSONS_PATH,
+            PORTAL_META_PATH,
+            reports_path=REPORTS_PATH,
+            information_sheets_path=INFORMATION_SHEETS_PATH,
+            letters_path=LETTERS_PATH,
+            glossary_path=GLOSSARY_PATH,
+        )
         self.embed_client = EmbedClient(EMBED_SERVICE_URL)
         self.reranker_client = RerankerClient(RERANKER_SERVICE_URL)
 
@@ -54,8 +66,20 @@ class RAGService:
         if self.lessons_collection is None or self.meta_collection is None:
             return
 
+        if RAG_FORCE_REINDEX:
+            try:
+                self.client.delete_collection(CHROMA_COLLECTION)
+            except Exception:
+                pass
+            try:
+                self.client.delete_collection(f"{CHROMA_COLLECTION}_meta")
+            except Exception:
+                pass
+            self.lessons_collection = self.client.get_or_create_collection(name=CHROMA_COLLECTION)
+            self.meta_collection = self.client.get_or_create_collection(name=f"{CHROMA_COLLECTION}_meta")
+
         if self.lessons_collection.count() == 0:
-            await self._index_documents(self.lessons_collection, self.loader.load_lessons())
+            await self._index_documents(self.lessons_collection, self.loader.load_lessons_corpus())
 
         if self.meta_collection.count() == 0:
             await self._index_documents(self.meta_collection, self.loader.load_meta())
@@ -71,12 +95,14 @@ class RAGService:
             for index, chunk in enumerate(self.chunk_text(document.text)):
                 ids.append(f"{document.id}::{index}")
                 texts.append(chunk)
+                canonical = document.metadata.get("ID_урока") or document.id
                 metadatas.append(
                     {
                         **document.metadata,
                         "title": document.title[:500],
                         "source_type": document.source_type,
-                        "lesson_id": document.id,
+                        "lesson_id": str(canonical)[:500],
+                        "doc_id": str(document.id)[:500],
                     }
                 )
 
@@ -126,7 +152,8 @@ class RAGService:
         for idx, item_id in enumerate(ids):
             metadata = metas[idx] if idx < len(metas) else {}
             st = metadata.get("source_type") or "lesson"
-            if st not in ("lesson", "meta"):
+            allowed = {"lesson", "meta", "report", "info_sheet", "letter", "glossary"}
+            if st not in allowed:
                 st = "lesson"
             items.append(
                 {

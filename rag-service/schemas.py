@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 Mode = Literal["chat", "search", "document", "mail"]
-SourceType = Literal["lesson", "meta"]
+SourceType = Literal["lesson", "meta", "report", "info_sheet", "letter", "glossary"]
 
 
 class RetrieveRequest(BaseModel):
