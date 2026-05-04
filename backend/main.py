@@ -18,6 +18,7 @@ from config import (
     GLOSSARY_PATH,
     HF_TOKEN,
     LESSONS_PATH,
+    LETTERS_PATH,
     LLM_API_KEY,
     LLM_BASE_URL,
     LLM_MODEL,
@@ -25,6 +26,7 @@ from config import (
     LLM_TIMEOUT_SECONDS,
     MEMORY_SERVICE_URL,
     RAG_SERVICE_URL,
+    REPORTS_PATH,
     RETRIEVAL_TOP_K,
 )
 
@@ -194,11 +196,83 @@ class BackendService:
         self.last_llm_error: str | None = None
         self._lessons_by_id: dict[str, dict[str, Any]] | None = None
         self._lessons_index_file: str | None = None
+        self._letter_formats: dict[str, list[str]] = self._build_format_catalogue(
+            LETTERS_PATH, group_key="Вид_документа"
+        )
+        self._report_formats: dict[str, list[str]] = self._build_format_catalogue(
+            REPORTS_PATH, group_key="Вид_шаблона"
+        )
         if HF_TOKEN:
             try:
                 self.hf_client = InferenceClient(provider=LLM_PROVIDER, token=HF_TOKEN)
             except Exception:
                 self.hf_client = None
+
+    @staticmethod
+    def _load_json_list(path: str, fallback_relative: str) -> list[dict]:
+        for p in (path, fallback_relative, f"data/{fallback_relative.split('/')[-1]}"):
+            try:
+                with open(p, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                if isinstance(data, list):
+                    return data
+            except (FileNotFoundError, OSError, json.JSONDecodeError):
+                continue
+        return []
+
+    def _build_format_catalogue(self, path: str, *, group_key: str) -> dict[str, list[str]]:
+        """Каталог форматов из JSON: {Вид: [типичные_поля]}.
+        Поле включается, если встречается в ≥30% записей вида или ≥2 записях.
+        Дедупит «Получатель» vs «Получатель_*», «Приложения» vs «Приложение_N».
+        """
+        items = self._load_json_list(path, "/data/" + path.rsplit("/", 1)[-1])
+        meta_keys = {"Вид_документа", "Вид_шаблона", "Имя_документа", "Имя_шаблона"}
+        groups: dict[str, list[dict]] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            kind = (item.get(group_key) or "").strip()
+            if kind:
+                groups.setdefault(kind, []).append(item)
+        catalogue: dict[str, list[str]] = {}
+        for kind, records in groups.items():
+            total = len(records)
+            counts: dict[str, int] = {}
+            order: list[str] = []
+            for rec in records:
+                for key in rec.keys():
+                    if key in meta_keys:
+                        continue
+                    if key not in counts:
+                        order.append(key)
+                    counts[key] = counts.get(key, 0) + 1
+            threshold = max(2, int(total * 0.3))
+            kept = [k for k in order if counts[k] >= threshold]
+            if not kept and records:
+                kept = [k for k in records[0].keys() if k not in meta_keys]
+            kept_set = set(kept)
+            if "Получатель" in kept_set and any(k.startswith("Получатель_") for k in kept_set):
+                kept = [k for k in kept if k != "Получатель"]
+            if "Приложения" in kept_set and any(k.startswith("Приложение_") for k in kept_set):
+                kept = [k for k in kept if k != "Приложения"]
+            catalogue[kind] = kept
+        return catalogue
+
+    @staticmethod
+    def _format_catalogue_to_text(catalogue: dict[str, list[str]]) -> str:
+        if not catalogue:
+            return "Каталог форматов недоступен."
+        lines: list[str] = []
+        for i, (kind, fields) in enumerate(catalogue.items(), start=1):
+            lines.append(f"{i}. «{kind}» — поля:")
+            lines.append("   " + ", ".join(fields))
+        return "\n".join(lines)
+
+    def letter_formats_block(self) -> str:
+        return self._format_catalogue_to_text(self._letter_formats)
+
+    def report_formats_block(self) -> str:
+        return self._format_catalogue_to_text(self._report_formats)
 
     async def call_memory(self, method: str, path: str, payload: dict | None = None) -> dict:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -234,12 +308,22 @@ class BackendService:
 
     def build_prompt(self, mode: Mode, *, message: str, history: str, context: str, meta_context: str) -> str:
         template = PROMPT_TEMPLATES.get(mode, PROMPT_TEMPLATES["chat"])
-        return template.format(
-            message=message,
-            history=history,
-            context=context,
-            meta_context=meta_context or "Мета-контекст не найден.",
-        )
+        try:
+            return template.format(
+                message=message,
+                history=history,
+                context=context,
+                meta_context=meta_context or "Мета-контекст не найден.",
+                letter_formats=self.letter_formats_block(),
+                report_formats=self.report_formats_block(),
+            )
+        except KeyError:
+            return template.format(
+                message=message,
+                history=history,
+                context=context,
+                meta_context=meta_context or "Мета-контекст не найден.",
+            )
 
     def normalize_generated_text(self, generated: object) -> str | None:
         if isinstance(generated, str):
@@ -356,14 +440,52 @@ class BackendService:
             ],
             "stream": False,
         }
+        # Ретрай на 429: уважаем Retry-After / "try again in Xs" из тела ответа.
+        max_attempts = 3
+        max_total_wait = 30.0
+        spent = 0.0
         async with httpx.AsyncClient(timeout=LLM_TIMEOUT_SECONDS) as client:
-            response = await client.post(self.llm_url(), headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            choices = data.get("choices") or []
-            if not choices:
-                return None
-            return choices[0].get("message", {}).get("content")
+            for attempt in range(1, max_attempts + 1):
+                response = await client.post(self.llm_url(), headers=headers, json=payload)
+                if response.status_code != 429:
+                    response.raise_for_status()
+                    data = response.json()
+                    choices = data.get("choices") or []
+                    if not choices:
+                        return None
+                    return choices[0].get("message", {}).get("content")
+                wait_s = self._parse_retry_after(response)
+                body_hint = response.text[:500]
+                self.logger.warning(
+                    "LLM 429 (attempt %d/%d). Wait %.1fs. Body: %s",
+                    attempt, max_attempts, wait_s, body_hint,
+                )
+                if attempt == max_attempts or spent + wait_s > max_total_wait:
+                    raise httpx.HTTPStatusError(
+                        f"429 after {attempt} attempts; wait_hint={wait_s:.1f}s; body={body_hint}",
+                        request=response.request, response=response,
+                    )
+                await asyncio.sleep(wait_s)
+                spent += wait_s
+            return None
+
+    @staticmethod
+    def _parse_retry_after(response: httpx.Response) -> float:
+        ra = response.headers.get("retry-after") or response.headers.get("Retry-After")
+        if ra:
+            try:
+                return max(1.0, float(ra))
+            except ValueError:
+                pass
+        try:
+            body = response.json()
+            msg = (body.get("error") or {}).get("message") or ""
+            m = re.search(r"try again in\s+([0-9.]+)\s*s", msg, re.IGNORECASE)
+            if m:
+                return max(1.0, float(m.group(1)) + 0.5)
+        except (ValueError, json.JSONDecodeError):
+            pass
+        return 5.0
 
     async def generate_hf(self, prompt: str) -> str | None:
         if not self.hf_client:
