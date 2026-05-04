@@ -11,9 +11,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from huggingface_hub import InferenceClient
 from pydantic import BaseModel, Field
+from glossary_terms import mentioned_glossary_entries, prepend_glossary_block
 from prompts import PROMPT_TEMPLATES, SYSTEM_PROMPT
 
 from config import (
+    GLOSSARY_PATH,
     HF_TOKEN,
     LESSONS_PATH,
     LLM_API_KEY,
@@ -30,7 +32,7 @@ from config import (
 #  Многослойный фильтр иностранных символов
 # ---------------------------------------------------------------------------
 
-# Слой 2: Промпт для LLM fix-up прохода
+# Промпт для LLM fix-up прохода (Слой 3)
 FIXUP_PROMPT = """Ниже приведён текст, в котором МОГУТ встречаться слова на иностранных языках
 (китайский, испанский, английский и др.), смешанные с русским текстом.
 
@@ -99,7 +101,7 @@ def has_foreign_content(text: str) -> bool:
 
     return False
 
-# ---------- Слой 3: Regex safety net ----------
+# ---------- Слой 2: Regex safety net ----------
 
 def strip_remaining_foreign(text: str) -> str:
     """Слой 3: финальная зачистка — убирает оставшиеся нежелательные символы."""
@@ -132,6 +134,12 @@ def strip_remaining_foreign(text: str) -> str:
         cleaned = new
     cleaned = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", cleaned)
     cleaned = cleaned.replace("*", "")
+
+    # Разделить слипшиеся слова (например "Длярешение" → "Для решение")
+    cleaned = re.sub(r'([а-яё])([А-ЯЁ])', r'\1 \2', cleaned)
+    # Разделить слипшиеся кириллица+латиница (например "проектахDIVIZIONA" → "проектах DIVIZIONA")
+    cleaned = re.sub(r'([а-яёА-ЯЁ])([A-Z])', r'\1 \2', cleaned)
+    cleaned = re.sub(r'([a-zA-Z])([А-ЯЁ])', r'\1 \2', cleaned)
 
     # Убрать двойные пробелы и лишние пустые строки
     cleaned = re.sub(r'  +', ' ', cleaned)
@@ -255,6 +263,17 @@ class BackendService:
             text = f"{text[:317]}..."
         return f"{title}: {text}" if text else title
 
+    def _extract_glossary_from_context(self, context: str) -> str | None:
+        """Извлекает блок глоссария из контекста, если он был подмешан."""
+        marker = "[ГЛОССАРИЙ ЕБДИУ"
+        if marker not in context:
+            return None
+        # Блок заканчивается разделителем ---
+        end = context.find("\n\n---\n\n")
+        if end == -1:
+            return context  # весь контекст — это глоссарий
+        return context[:end].strip()
+
     def fallback_response(
         self,
         mode: Mode,
@@ -264,6 +283,11 @@ class BackendService:
         meta_context: str,
         lesson_results: list[dict],
     ) -> str:
+        # Если в контексте есть глоссарий — вернуть определение как основной ответ
+        glossary_block = self._extract_glossary_from_context(context)
+        if glossary_block and mode == "chat":
+            return glossary_block
+
         lesson_briefs = [self.format_lesson_brief(item) for item in lesson_results[:5]]
 
         if mode == "search":
@@ -300,7 +324,7 @@ class BackendService:
                 "Предлагаю использовать эти материалы как основу для дальнейшей проработки вопроса. "
                 "При необходимости можно дополнительно уточнить запрос по этапу проекта, виду работ или типу проблемы.\n\n"
                 "С уважением,\n"
-                "Ассистент раздела \"Извлеченные уроки\""
+                "[УКАЗАТЬ: ФИО, должность, подразделение]"
             )
 
         if lesson_briefs:
@@ -423,18 +447,15 @@ class BackendService:
 
         # Слой 1: Детекция — есть ли иностранный контент?
         if not has_foreign_content(normalized):
-            # Чисто — только markdown-очистка
+            # Чисто — только markdown-очистка и разлепка слов
             return strip_remaining_foreign(normalized)
 
         self.logger.info("Foreign content detected, applying multi-layer filter")
 
-        # Если после словаря всё чисто — готово
-        if not has_foreign_content(normalized):
-            self.logger.info("Layer 2 (dictionary) resolved all foreign content")
-            return strip_remaining_foreign(normalized)
+        after_dict = normalized
 
         # Слой 2: LLM fix-up проход
-        fixup_result = await self._llm_fixup(normalized)
+        fixup_result = await self._llm_fixup(after_dict)
         if fixup_result:
             fixup_normalized = self.normalize_generated_text(fixup_result)
             if fixup_normalized and not has_foreign_content(fixup_normalized):
@@ -442,11 +463,23 @@ class BackendService:
                 return strip_remaining_foreign(fixup_normalized)
             # Даже если fix-up не полностью очистил — берём его результат как базу
             if fixup_normalized:
-                normalized = fixup_normalized
+                after_dict = fixup_normalized
 
         # Слой 3: Regex safety net — жёсткая зачистка оставшегося
         self.logger.info("Layer 4 (regex safety net) applied")
-        return strip_remaining_foreign(normalized)
+        result = strip_remaining_foreign(after_dict)
+
+        # Защита: если после фильтрации текст стал слишком коротким — вернуть fallback
+        if len(result.strip()) < 30:
+            self.logger.warning("Filtered text too short (%d chars), using fallback", len(result))
+            return self.fallback_response(
+                mode,
+                message=message,
+                context=context,
+                meta_context=meta_context,
+                lesson_results=lesson_results,
+            )
+        return result
 
     def _ensure_lessons_index(self) -> dict[str, dict[str, Any]]:
         if not LESSONS_PATH:
@@ -523,6 +556,9 @@ class BackendService:
             }
         )
         context = retrieval.get("context", "")
+        glossary_hits = mentioned_glossary_entries(request.message, GLOSSARY_PATH)
+        if glossary_hits:
+            context = prepend_glossary_block(context, glossary_hits)
         meta_context = retrieval.get("meta_context", "")
         results = retrieval.get("results", [])
         lesson_results = retrieval.get("lesson_results", [])
