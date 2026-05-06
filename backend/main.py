@@ -13,6 +13,7 @@ from huggingface_hub import InferenceClient
 from pydantic import BaseModel, Field
 from glossary_terms import mentioned_glossary_entries, prepend_glossary_block
 from prompts import PROMPT_TEMPLATES, SYSTEM_PROMPT
+from report_template_catalog import load_kind_to_ordered_labels
 
 from config import (
     GLOSSARY_PATH,
@@ -27,6 +28,7 @@ from config import (
     MEMORY_SERVICE_URL,
     RAG_SERVICE_URL,
     REPORTS_PATH,
+    REPORT_TEMPLATE_SCHEMAS_DIR,
     RETRIEVAL_TOP_K,
 )
 
@@ -202,11 +204,24 @@ class BackendService:
         self._report_formats: dict[str, list[str]] = self._build_format_catalogue(
             REPORTS_PATH, group_key="Вид_шаблона"
         )
+        schemas_dir = self._resolve_report_template_schemas_dir()
+        self._report_template_field_labels: dict[str, list[tuple[str, str]]] = load_kind_to_ordered_labels(
+            schemas_dir
+        )
         if HF_TOKEN:
             try:
                 self.hf_client = InferenceClient(provider=LLM_PROVIDER, token=HF_TOKEN)
             except Exception:
                 self.hf_client = None
+
+    @staticmethod
+    def _resolve_report_template_schemas_dir() -> Path:
+        if REPORT_TEMPLATE_SCHEMAS_DIR:
+            return Path(REPORT_TEMPLATE_SCHEMAS_DIR)
+        from_data = Path(REPORTS_PATH).parent / "report_template_schemas"
+        if from_data.is_dir():
+            return from_data
+        return Path(__file__).resolve().parent.parent / "data" / "report_template_schemas"
 
     @staticmethod
     def _load_json_list(path: str, fallback_relative: str) -> list[dict]:
@@ -272,7 +287,16 @@ class BackendService:
         return self._format_catalogue_to_text(self._letter_formats)
 
     def report_formats_block(self) -> str:
-        return self._format_catalogue_to_text(self._report_formats)
+        merged: dict[str, list[str]] = {}
+        for kind, keys in self._report_formats.items():
+            if kind in self._report_template_field_labels:
+                merged[kind] = [lbl for _k, lbl in self._report_template_field_labels[kind]]
+            else:
+                merged[kind] = keys
+        for kind, pairs in self._report_template_field_labels.items():
+            if kind not in merged:
+                merged[kind] = [lbl for _k, lbl in pairs]
+        return self._format_catalogue_to_text(merged)
 
     async def call_memory(self, method: str, path: str, payload: dict | None = None) -> dict:
         async with httpx.AsyncClient(timeout=30.0) as client:

@@ -1,0 +1,60 @@
+{
+  "appendix": 11,
+  "template_kind": "Форма протокола рассмотрения урока для направления в качестве улучшений в процессы",
+  "fields": {
+    "line_number": {
+      "description": "№ п/п",
+      "required": true,
+      "type": "string",
+      "example": "1"
+    },
+    "lesson_name": {
+      "description": "Наименование урока",
+      "required": true,
+      "type": "string",
+      "example": "Оптимизация процесса согласования чертежей на этапе монтажа"
+    },
+    "ebdiu_number_and_date": {
+      "description": "Номер и дата внесения урока в ЕБДИУ",
+      "required": true,
+      "type": "string",
+      "example": "LL-2026-045 от 15.03.2026"
+    },
+    "source_name": {
+      "description": "Источник, наименование",
+      "required": true,
+      "type": "string",
+      "example": "Проектный офис АЭС «Аккую»"
+    },
+    "process_name_for_improvement": {
+      "description": "Название процесса для использования улучшения",
+      "required": true,
+      "type": "string",
+      "example": "Управление качеством на этапе монтажа оборудования"
+    },
+    "practical_experience_description": {
+      "description": "Описание опыта для практического использования",
+      "required": true,
+      "type": "string",
+      "example": "Применение шаблона КЖ позволило сократить время согласования на 40%"
+    },
+    "experts_conclusion": {
+      "description": "Заключение Экспертов",
+      "required": true,
+      "type": "string",
+      "example": "Опыт признан успешным и рекомендован к тиражированию"
+    },
+    "improvement_team_proposal": {
+      "description": "Предложение команды реализации улучшений",
+      "required": true,
+      "type": "string",
+      "example": "Внедрить шаблон КЖ во все проекты сооружения АЭС до 01.07.2026"
+    },
+    "process_owner_decision": {
+      "description": "Решение Владельца процесса управления уроками и улучшениями",
+      "required": true,
+      "type": "string",
+      "example": "Утверждено. Назначен ответственный за внедрение — Иванов И.И."
+    }
+  }
+}
