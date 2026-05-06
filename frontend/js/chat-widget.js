@@ -106,6 +106,13 @@ function clearAllWidgetStorage() {
     sessionStorage.removeItem(STORAGE_RETURNING_FROM_LESSON);
     sessionStorage.removeItem(STORAGE_SESSION_ID);
     sessionStorage.removeItem(STORAGE_UI_LAYOUT);
+    if (typeof LessonsOpenedHistory !== 'undefined') {
+      LessonsOpenedHistory.clear();
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  try {
     for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
       const k = sessionStorage.key(i);
       if (
@@ -168,11 +175,105 @@ function escapeHtml(value) {
   return (value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
+function isAssistantExpanded() {
+  return Boolean(assistantOverlay?.classList.contains('open'));
+}
+
+/** Панель чата, которую сейчас видит пользователь: полноэкранная или компактная. */
+function activeMessagesPanel() {
+  return isAssistantExpanded() ? assistantMessages : messages;
+}
+
+/** Дублирует разметку чата во вторую панель (компакт ↔ полноэкранный). */
+function mirrorChatPanelsFrom(sourcePanel) {
+  if (!messages || !assistantMessages || !sourcePanel) return;
+  const dest = sourcePanel === messages ? assistantMessages : messages;
+  dest.innerHTML = sourcePanel.innerHTML;
+}
+
 function lessonPageHref(lessonCode) {
   const q = new URLSearchParams();
   q.set('lessonId', lessonCode);
   q.set('backendUrl', API_CONFIG.baseUrl);
   return `lesson.html?${q.toString()}`;
+}
+
+function renderOpenedLessonsPanels() {
+  const hist =
+    typeof LessonsOpenedHistory !== 'undefined' ? LessonsOpenedHistory.getList() : [];
+  const ul = document.getElementById('openedLessonsSidebarList');
+  if (!ul) return;
+  ul.innerHTML = '';
+  if (!hist.length) {
+    const li = document.createElement('li');
+    li.className = 'opened-lessons-empty';
+    li.textContent =
+      'Уроки появятся здесь после перехода по ссылке LL… из ответа ассистента.';
+    ul.appendChild(li);
+    return;
+  }
+  hist.forEach((entry) => {
+    if (!entry || !entry.id) return;
+    const id = entry.id;
+    const title =
+      entry.title && String(entry.title).trim() ? String(entry.title).trim() : id;
+    let timeStr = '';
+    try {
+      timeStr = entry.openedAt
+        ? new Date(entry.openedAt).toLocaleString('ru-RU', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '';
+    } catch (e) {
+      timeStr = '';
+    }
+    const li = document.createElement('li');
+    li.className = 'opened-lessons-item';
+    const a = document.createElement('a');
+    a.className = 'opened-lessons-row lesson-inline-link';
+    a.href = lessonPageHref(id);
+    a.addEventListener('click', () => persistStateBeforeOpeningLesson());
+    const titleEl = document.createElement('span');
+    titleEl.className = 'opened-lessons-row-title';
+    const primary = title.length > 120 ? `${title.slice(0, 117)}…` : title;
+    titleEl.textContent = primary;
+    titleEl.title = title;
+    const meta = document.createElement('span');
+    meta.className = 'opened-lessons-row-meta';
+    if (title !== id) {
+      meta.textContent = timeStr ? `${id} · ${timeStr}` : id;
+    } else {
+      meta.textContent = timeStr || '';
+    }
+    a.appendChild(titleEl);
+    a.appendChild(meta);
+    li.appendChild(a);
+    ul.appendChild(li);
+  });
+}
+
+function initOpenedLessonsUi() {
+  document.body.addEventListener('click', (event) => {
+    const btn = event.target.closest('.opened-lessons-clear-btn');
+    if (!btn) return;
+    if (typeof LessonsOpenedHistory !== 'undefined') LessonsOpenedHistory.clear();
+  });
+  window.addEventListener('lessonsOpenedHistoryUpdated', renderOpenedLessonsPanels);
+  window.addEventListener('pageshow', () => {
+    renderOpenedLessonsPanels();
+  });
+  window.addEventListener('storage', (event) => {
+    if (
+      typeof LessonsOpenedHistory !== 'undefined' &&
+      event.key === LessonsOpenedHistory.STORAGE_KEY
+    ) {
+      renderOpenedLessonsPanels();
+    }
+  });
+  renderOpenedLessonsPanels();
 }
 
 function stripMarkdownAsterisks(text) {
@@ -299,8 +400,8 @@ function assistantBubble(container, text, lessons, mode = currentMode) {
 
 function loadingBubble(container, mode = currentMode) {
   const el = document.createElement('div');
-  el.className = 'bubble assistant';
-  el.innerHTML = `Идет обработка запроса...<span class="meta">assistant • ${now()} • ${mode}</span>`;
+  el.className = 'bubble assistant bubble-loading';
+  el.innerHTML = `Идёт обработка запроса…<span class="meta">assistant • ${now()} • ${mode}</span>`;
   container.appendChild(el);
   container.scrollTop = container.scrollHeight;
   return el;
@@ -323,7 +424,7 @@ function scrollChatPanelsToBottomSoon() {
 }
 
 function syncSmallToLarge() {
-  assistantMessages.innerHTML = messages.innerHTML;
+  mirrorChatPanelsFrom(messages);
   assistantInput.value = input.value;
   scrollChatPanelsToBottom();
 }
@@ -391,6 +492,7 @@ async function tryRestoreSessionById(saved) {
       chatWrapper?.classList.add('open');
     }
     scrollChatPanelsToBottomSoon();
+    renderOpenedLessonsPanels();
     return true;
   } catch (e) {
     return false;
@@ -418,10 +520,11 @@ async function sendMessage(sourceInput) {
   input.value = '';
   assistantInput.value = '';
 
-  const panel = messages;
+  const panel = activeMessagesPanel();
   bubble(panel, message, 'user', activeMode);
   loading = true;
   const loader = loadingBubble(panel, activeMode);
+  mirrorChatPanelsFrom(panel);
 
   try {
     const response = await apiService.respond(sessionId, message, activeMode);
@@ -429,16 +532,17 @@ async function sendMessage(sourceInput) {
     const answerText = response.text || response.answer || '';
     const lessons = response.lessons || [];
     assistantBubble(panel, answerText, lessons, activeMode);
-    syncSmallToLarge();
+    mirrorChatPanelsFrom(panel);
     const turnIndex = panel.querySelectorAll('.assistant-turn').length - 1;
     persistAssistantLessons(sessionId, turnIndex, lessons);
     appendTranscriptTurn(sessionId, message, answerText, activeMode);
   } catch (error) {
     loader.remove();
     bubble(panel, `Ошибка: ${error.message}`, 'assistant', activeMode);
-    syncSmallToLarge();
+    mirrorChatPanelsFrom(panel);
   } finally {
     loading = false;
+    scrollChatPanelsToBottomSoon();
   }
 }
 
@@ -452,11 +556,13 @@ expandBtn?.addEventListener('click', () => {
   assistantOverlay.classList.add('open');
   document.body.classList.add('overlay-open');
   scrollChatPanelsToBottomSoon();
+  renderOpenedLessonsPanels();
 });
 assistantBack?.addEventListener('click', () => {
   if (input && assistantInput) {
     input.value = assistantInput.value;
   }
+  mirrorChatPanelsFrom(assistantMessages);
   assistantOverlay.classList.remove('open');
   document.body.classList.remove('overlay-open');
   scrollChatPanelsToBottomSoon();
@@ -478,7 +584,24 @@ document.querySelectorAll('.mode-bar').forEach((bar) => {
 });
 function onLessonLinkActivate(event) {
   const a = event.target.closest('a.lesson-inline-link');
-  if (a) persistStateBeforeOpeningLesson();
+  if (!a) return;
+  persistStateBeforeOpeningLesson();
+  if (typeof LessonsOpenedHistory !== 'undefined') {
+    try {
+      const href = a.getAttribute('href') || '';
+      const u = new URL(href, window.location.href);
+      const lid = u.searchParams.get('lessonId');
+      if (lid) {
+        LessonsOpenedHistory.record(lid, null);
+      } else {
+        const t = (a.textContent || '').trim();
+        if (/^LL\d+$/i.test(t)) LessonsOpenedHistory.record(t, null);
+      }
+    } catch (e) {
+      const t = (a.textContent || '').trim();
+      if (/^LL\d+$/i.test(t)) LessonsOpenedHistory.record(t, null);
+    }
+  }
 }
 messages?.addEventListener('click', onLessonLinkActivate);
 assistantMessages?.addEventListener('click', onLessonLinkActivate);
@@ -529,6 +652,8 @@ async function bootstrapWidget() {
   }
   syncSmallToLarge();
   scrollChatPanelsToBottomSoon();
+  renderOpenedLessonsPanels();
 }
 
+initOpenedLessonsUi();
 bootstrapWidget();

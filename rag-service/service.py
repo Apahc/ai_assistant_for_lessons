@@ -120,16 +120,30 @@ class RAGService:
                 unique_parts.append(part)
         return "\n".join(unique_parts)
 
-    async def _query_collection(self, collection, query: str, top_k: int) -> list[dict]:
+    async def _query_collection(
+        self,
+        collection,
+        query: str,
+        top_k: int,
+        corpus_source_types: list[str] | None = None,
+    ) -> list[dict]:
         if collection is None or collection.count() == 0:
             return []
 
         query_embedding = (await self.embed_client.embed([query]))[0]
-        raw = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=max(top_k, RETRIEVAL_CANDIDATE_K),
-            include=["documents", "metadatas", "distances"],
-        )
+        n_results = max(top_k, RETRIEVAL_CANDIDATE_K)
+        query_kwargs: dict = {
+            "query_embeddings": [query_embedding],
+            "n_results": n_results,
+            "include": ["documents", "metadatas", "distances"],
+        }
+        if corpus_source_types:
+            if len(corpus_source_types) == 1:
+                query_kwargs["where"] = {"source_type": corpus_source_types[0]}
+            else:
+                query_kwargs["where"] = {"$or": [{"source_type": st} for st in corpus_source_types]}
+
+        raw = collection.query(**query_kwargs)
 
         ids = raw.get("ids", [[]])[0]
         docs = raw.get("documents", [[]])[0]
@@ -154,8 +168,20 @@ class RAGService:
             )
         return items
 
-    async def _retrieve_lessons(self, search_query: str, top_k: int) -> list[dict]:
-        lesson_candidates = await self._query_collection(self.lessons_collection, search_query, top_k)
+    async def _retrieve_lessons(
+        self,
+        search_query: str,
+        top_k: int,
+        corpus_source_types: list[str] | None = None,
+    ) -> list[dict]:
+        lesson_candidates = await self._query_collection(
+            self.lessons_collection, search_query, top_k, corpus_source_types
+        )
+        # Если запрошены только уроки, но по фильтру ничего не нашлось — повтор без фильтра.
+        if corpus_source_types == ["lesson"] and not lesson_candidates:
+            lesson_candidates = await self._query_collection(
+                self.lessons_collection, search_query, top_k, None
+            )
         return await self.reranker_client.rerank(search_query, lesson_candidates, top_k)
 
     async def _retrieve_meta(self, search_query: str, mode: str, top_k: int) -> list[dict]:
@@ -180,7 +206,10 @@ class RAGService:
             raise RuntimeError("Collections are not initialized")
 
         search_query = self.build_search_query(request.query, request.session_messages)
-        lesson_results = await self._retrieve_lessons(search_query, request.top_k)
+        corpus_filter = request.corpus_source_types
+        if corpus_filter is not None and len(corpus_filter) == 0:
+            corpus_filter = None
+        lesson_results = await self._retrieve_lessons(search_query, request.top_k, corpus_filter)
         meta_results = await self._retrieve_meta(search_query, request.mode, request.top_k)
         context, meta_context, lessons_texts = assemble_context(request.mode, lesson_results, meta_results)
 
