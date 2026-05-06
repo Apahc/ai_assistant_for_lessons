@@ -158,6 +158,9 @@ services:
       REDIS_URL: ${REDIS_URL}
       POSTGRES_DSN: ${POSTGRES_DSN}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS}
+      REPORT_TEMPLATE_SCHEMAS_DIR: ${REPORT_TEMPLATE_SCHEMAS_DIR:-/data/report_template_schemas}
+    volumes:
+      - ./data:/data:ro
     ports:
       - "${MEMORY_SERVICE_PORT:-8005}:8005"
     depends_on:

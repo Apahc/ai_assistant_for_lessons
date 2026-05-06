@@ -3,6 +3,7 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import psycopg
@@ -14,6 +15,7 @@ from psycopg.rows import dict_row
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 POSTGRES_DSN = os.getenv("POSTGRES_DSN", "postgresql://lessons:lessons@postgres:5432/lessons")
+REPORT_TEMPLATE_SCHEMAS_DIR = os.getenv("REPORT_TEMPLATE_SCHEMAS_DIR", "/data/report_template_schemas")
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "14400"))
 DB_STARTUP_RETRIES = int(os.getenv("DB_STARTUP_RETRIES", "20"))
 DB_STARTUP_RETRY_DELAY_SECONDS = float(os.getenv("DB_STARTUP_RETRY_DELAY_SECONDS", "2"))
@@ -117,12 +119,58 @@ def ensure_schema() -> None:
                         create index if not exists idx_request_logs_session_id on request_logs(session_id);
                         """
                     )
+                    cur.execute(
+                        """
+                        create table if not exists report_template_schemas (
+                            template_kind text primary key,
+                            appendix_number int,
+                            schema_json jsonb not null,
+                            updated_at timestamptz not null default now()
+                        );
+                        """
+                    )
                 conn.commit()
             return
         except Exception as exc:
             last_error = exc
             time.sleep(DB_STARTUP_RETRY_DELAY_SECONDS)
     raise RuntimeError("Postgres is not available") from last_error
+
+
+def seed_report_template_schemas() -> None:
+    """Загружает appendix_*.json из каталога и upsert в Postgres."""
+    base = Path(REPORT_TEMPLATE_SCHEMAS_DIR)
+    if not base.is_dir():
+        return
+    for path in sorted(base.glob("*.json")):
+        try:
+            raw = path.read_text(encoding="utf-8")
+            data = json.loads(raw)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        kind = (data.get("template_kind") or "").strip()
+        if not kind or "fields" not in data:
+            continue
+        appendix = data.get("appendix")
+        try:
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        insert into report_template_schemas (template_kind, appendix_number, schema_json, updated_at)
+                        values (%s, %s, %s::jsonb, %s)
+                        on conflict (template_kind) do update set
+                          appendix_number = excluded.appendix_number,
+                          schema_json = excluded.schema_json,
+                          updated_at = excluded.updated_at
+                        """,
+                        (kind, appendix, raw, utc_now()),
+                    )
+                conn.commit()
+        except Exception:
+            continue
 
 
 def redis_messages_key(session_id: str) -> str:
@@ -322,6 +370,7 @@ async def request_logger(request: Request, call_next):
 @app.on_event("startup")
 async def startup() -> None:
     ensure_schema()
+    seed_report_template_schemas()
 
 
 @app.get("/health")
@@ -337,6 +386,21 @@ async def health() -> dict:
 @app.get("/health/ready")
 async def health_ready() -> dict:
     return await health()
+
+
+@app.get("/report-templates")
+async def list_report_templates() -> dict[str, Any]:
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                select template_kind, appendix_number, schema_json, updated_at
+                from report_template_schemas
+                order by appendix_number nulls last, template_kind
+                """
+            )
+            rows = cur.fetchall()
+    return {"templates": [dict(row) for row in rows]}
 
 
 @app.post("/sessions", response_model=SessionResponse)
