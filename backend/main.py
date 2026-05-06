@@ -18,6 +18,7 @@ from config import (
     GLOSSARY_PATH,
     HF_TOKEN,
     LESSONS_PATH,
+    LETTERS_PATH,
     LLM_API_KEY,
     LLM_BASE_URL,
     LLM_MODEL,
@@ -25,6 +26,7 @@ from config import (
     LLM_TIMEOUT_SECONDS,
     MEMORY_SERVICE_URL,
     RAG_SERVICE_URL,
+    REPORTS_PATH,
     RETRIEVAL_TOP_K,
 )
 
@@ -32,7 +34,7 @@ from config import (
 #  Многослойный фильтр иностранных символов
 # ---------------------------------------------------------------------------
 
-# Слой 2: Промпт для LLM fix-up прохода
+# Промпт для LLM fix-up прохода (Слой 3)
 FIXUP_PROMPT = """Ниже приведён текст, в котором МОГУТ встречаться слова на иностранных языках
 (китайский, испанский, английский и др.), смешанные с русским текстом.
 
@@ -101,7 +103,7 @@ def has_foreign_content(text: str) -> bool:
 
     return False
 
-# ---------- Слой 3: Regex safety net ----------
+# ---------- Слой 2: Regex safety net ----------
 
 def strip_remaining_foreign(text: str) -> str:
     """Слой 3: финальная зачистка — убирает оставшиеся нежелательные символы."""
@@ -134,6 +136,12 @@ def strip_remaining_foreign(text: str) -> str:
         cleaned = new
     cleaned = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", cleaned)
     cleaned = cleaned.replace("*", "")
+
+    # Разделить слипшиеся слова (например "Длярешение" → "Для решение")
+    cleaned = re.sub(r'([а-яё])([А-ЯЁ])', r'\1 \2', cleaned)
+    # Разделить слипшиеся кириллица+латиница (например "проектахDIVIZIONA" → "проектах DIVIZIONA")
+    cleaned = re.sub(r'([а-яёА-ЯЁ])([A-Z])', r'\1 \2', cleaned)
+    cleaned = re.sub(r'([a-zA-Z])([А-ЯЁ])', r'\1 \2', cleaned)
 
     # Убрать двойные пробелы и лишние пустые строки
     cleaned = re.sub(r'  +', ' ', cleaned)
@@ -188,11 +196,83 @@ class BackendService:
         self.last_llm_error: str | None = None
         self._lessons_by_id: dict[str, dict[str, Any]] | None = None
         self._lessons_index_file: str | None = None
+        self._letter_formats: dict[str, list[str]] = self._build_format_catalogue(
+            LETTERS_PATH, group_key="Вид_документа"
+        )
+        self._report_formats: dict[str, list[str]] = self._build_format_catalogue(
+            REPORTS_PATH, group_key="Вид_шаблона"
+        )
         if HF_TOKEN:
             try:
                 self.hf_client = InferenceClient(provider=LLM_PROVIDER, token=HF_TOKEN)
             except Exception:
                 self.hf_client = None
+
+    @staticmethod
+    def _load_json_list(path: str, fallback_relative: str) -> list[dict]:
+        for p in (path, fallback_relative, f"data/{fallback_relative.split('/')[-1]}"):
+            try:
+                with open(p, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                if isinstance(data, list):
+                    return data
+            except (FileNotFoundError, OSError, json.JSONDecodeError):
+                continue
+        return []
+
+    def _build_format_catalogue(self, path: str, *, group_key: str) -> dict[str, list[str]]:
+        """Каталог форматов из JSON: {Вид: [типичные_поля]}.
+        Поле включается, если встречается в ≥30% записей вида или ≥2 записях.
+        Дедупит «Получатель» vs «Получатель_*», «Приложения» vs «Приложение_N».
+        """
+        items = self._load_json_list(path, "/data/" + path.rsplit("/", 1)[-1])
+        meta_keys = {"Вид_документа", "Вид_шаблона", "Имя_документа", "Имя_шаблона"}
+        groups: dict[str, list[dict]] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            kind = (item.get(group_key) or "").strip()
+            if kind:
+                groups.setdefault(kind, []).append(item)
+        catalogue: dict[str, list[str]] = {}
+        for kind, records in groups.items():
+            total = len(records)
+            counts: dict[str, int] = {}
+            order: list[str] = []
+            for rec in records:
+                for key in rec.keys():
+                    if key in meta_keys:
+                        continue
+                    if key not in counts:
+                        order.append(key)
+                    counts[key] = counts.get(key, 0) + 1
+            threshold = max(2, int(total * 0.3))
+            kept = [k for k in order if counts[k] >= threshold]
+            if not kept and records:
+                kept = [k for k in records[0].keys() if k not in meta_keys]
+            kept_set = set(kept)
+            if "Получатель" in kept_set and any(k.startswith("Получатель_") for k in kept_set):
+                kept = [k for k in kept if k != "Получатель"]
+            if "Приложения" in kept_set and any(k.startswith("Приложение_") for k in kept_set):
+                kept = [k for k in kept if k != "Приложения"]
+            catalogue[kind] = kept
+        return catalogue
+
+    @staticmethod
+    def _format_catalogue_to_text(catalogue: dict[str, list[str]]) -> str:
+        if not catalogue:
+            return "Каталог форматов недоступен."
+        lines: list[str] = []
+        for i, (kind, fields) in enumerate(catalogue.items(), start=1):
+            lines.append(f"{i}. «{kind}» — поля:")
+            lines.append("   " + ", ".join(fields))
+        return "\n".join(lines)
+
+    def letter_formats_block(self) -> str:
+        return self._format_catalogue_to_text(self._letter_formats)
+
+    def report_formats_block(self) -> str:
+        return self._format_catalogue_to_text(self._report_formats)
 
     async def call_memory(self, method: str, path: str, payload: dict | None = None) -> dict:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -228,12 +308,22 @@ class BackendService:
 
     def build_prompt(self, mode: Mode, *, message: str, history: str, context: str, meta_context: str) -> str:
         template = PROMPT_TEMPLATES.get(mode, PROMPT_TEMPLATES["chat"])
-        return template.format(
-            message=message,
-            history=history,
-            context=context,
-            meta_context=meta_context or "Мета-контекст не найден.",
-        )
+        try:
+            return template.format(
+                message=message,
+                history=history,
+                context=context,
+                meta_context=meta_context or "Мета-контекст не найден.",
+                letter_formats=self.letter_formats_block(),
+                report_formats=self.report_formats_block(),
+            )
+        except KeyError:
+            return template.format(
+                message=message,
+                history=history,
+                context=context,
+                meta_context=meta_context or "Мета-контекст не найден.",
+            )
 
     def normalize_generated_text(self, generated: object) -> str | None:
         if isinstance(generated, str):
@@ -257,6 +347,17 @@ class BackendService:
             text = f"{text[:317]}..."
         return f"{title}: {text}" if text else title
 
+    def _extract_glossary_from_context(self, context: str) -> str | None:
+        """Извлекает блок глоссария из контекста, если он был подмешан."""
+        marker = "[ГЛОССАРИЙ ЕБДИУ"
+        if marker not in context:
+            return None
+        # Блок заканчивается разделителем ---
+        end = context.find("\n\n---\n\n")
+        if end == -1:
+            return context  # весь контекст — это глоссарий
+        return context[:end].strip()
+
     def fallback_response(
         self,
         mode: Mode,
@@ -266,6 +367,11 @@ class BackendService:
         meta_context: str,
         lesson_results: list[dict],
     ) -> str:
+        # Если в контексте есть глоссарий — вернуть определение как основной ответ
+        glossary_block = self._extract_glossary_from_context(context)
+        if glossary_block and mode == "chat":
+            return glossary_block
+
         lesson_briefs = [self.format_lesson_brief(item) for item in lesson_results[:5]]
 
         if mode == "search":
@@ -302,7 +408,7 @@ class BackendService:
                 "Предлагаю использовать эти материалы как основу для дальнейшей проработки вопроса. "
                 "При необходимости можно дополнительно уточнить запрос по этапу проекта, виду работ или типу проблемы.\n\n"
                 "С уважением,\n"
-                "Ассистент раздела \"Извлеченные уроки\""
+                "[УКАЗАТЬ: ФИО, должность, подразделение]"
             )
 
         if lesson_briefs:
@@ -334,14 +440,52 @@ class BackendService:
             ],
             "stream": False,
         }
+        # Ретрай на 429: уважаем Retry-After / "try again in Xs" из тела ответа.
+        max_attempts = 3
+        max_total_wait = 30.0
+        spent = 0.0
         async with httpx.AsyncClient(timeout=LLM_TIMEOUT_SECONDS) as client:
-            response = await client.post(self.llm_url(), headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            choices = data.get("choices") or []
-            if not choices:
-                return None
-            return choices[0].get("message", {}).get("content")
+            for attempt in range(1, max_attempts + 1):
+                response = await client.post(self.llm_url(), headers=headers, json=payload)
+                if response.status_code != 429:
+                    response.raise_for_status()
+                    data = response.json()
+                    choices = data.get("choices") or []
+                    if not choices:
+                        return None
+                    return choices[0].get("message", {}).get("content")
+                wait_s = self._parse_retry_after(response)
+                body_hint = response.text[:500]
+                self.logger.warning(
+                    "LLM 429 (attempt %d/%d). Wait %.1fs. Body: %s",
+                    attempt, max_attempts, wait_s, body_hint,
+                )
+                if attempt == max_attempts or spent + wait_s > max_total_wait:
+                    raise httpx.HTTPStatusError(
+                        f"429 after {attempt} attempts; wait_hint={wait_s:.1f}s; body={body_hint}",
+                        request=response.request, response=response,
+                    )
+                await asyncio.sleep(wait_s)
+                spent += wait_s
+            return None
+
+    @staticmethod
+    def _parse_retry_after(response: httpx.Response) -> float:
+        ra = response.headers.get("retry-after") or response.headers.get("Retry-After")
+        if ra:
+            try:
+                return max(1.0, float(ra))
+            except ValueError:
+                pass
+        try:
+            body = response.json()
+            msg = (body.get("error") or {}).get("message") or ""
+            m = re.search(r"try again in\s+([0-9.]+)\s*s", msg, re.IGNORECASE)
+            if m:
+                return max(1.0, float(m.group(1)) + 0.5)
+        except (ValueError, json.JSONDecodeError):
+            pass
+        return 5.0
 
     async def generate_hf(self, prompt: str) -> str | None:
         if not self.hf_client:
@@ -425,18 +569,15 @@ class BackendService:
 
         # Слой 1: Детекция — есть ли иностранный контент?
         if not has_foreign_content(normalized):
-            # Чисто — только markdown-очистка
+            # Чисто — только markdown-очистка и разлепка слов
             return strip_remaining_foreign(normalized)
 
         self.logger.info("Foreign content detected, applying multi-layer filter")
 
-        # Если после словаря всё чисто — готово
-        if not has_foreign_content(normalized):
-            self.logger.info("Layer 2 (dictionary) resolved all foreign content")
-            return strip_remaining_foreign(normalized)
+        after_dict = normalized
 
         # Слой 2: LLM fix-up проход
-        fixup_result = await self._llm_fixup(normalized)
+        fixup_result = await self._llm_fixup(after_dict)
         if fixup_result:
             fixup_normalized = self.normalize_generated_text(fixup_result)
             if fixup_normalized and not has_foreign_content(fixup_normalized):
@@ -444,11 +585,23 @@ class BackendService:
                 return strip_remaining_foreign(fixup_normalized)
             # Даже если fix-up не полностью очистил — берём его результат как базу
             if fixup_normalized:
-                normalized = fixup_normalized
+                after_dict = fixup_normalized
 
         # Слой 3: Regex safety net — жёсткая зачистка оставшегося
         self.logger.info("Layer 4 (regex safety net) applied")
-        return strip_remaining_foreign(normalized)
+        result = strip_remaining_foreign(after_dict)
+
+        # Защита: если после фильтрации текст стал слишком коротким — вернуть fallback
+        if len(result.strip()) < 30:
+            self.logger.warning("Filtered text too short (%d chars), using fallback", len(result))
+            return self.fallback_response(
+                mode,
+                message=message,
+                context=context,
+                meta_context=meta_context,
+                lesson_results=lesson_results,
+            )
+        return result
 
     def _ensure_lessons_index(self) -> dict[str, dict[str, Any]]:
         if not LESSONS_PATH:

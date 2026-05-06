@@ -13,3 +13,5 @@ RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
 
 LESSONS_PATH = os.getenv("LESSONS_PATH", "/data/lessons.json").strip()
 GLOSSARY_PATH = os.getenv("GLOSSARY_PATH", "/data/glossary.json").strip()
+LETTERS_PATH = os.getenv("LETTERS_PATH", "/data/letters.json").strip()
+REPORTS_PATH = os.getenv("REPORTS_PATH", "/data/reports.json").strip()

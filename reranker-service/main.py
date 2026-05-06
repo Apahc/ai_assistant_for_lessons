@@ -14,6 +14,17 @@ def tokenize(text: str) -> set[str]:
     return {token for token in re.findall(r"\w+", (text or "").lower()) if len(token) > 1}
 
 
+def _stable_id(item: dict) -> str:
+    """Стабильный идентификатор для тай-брейкера сортировки."""
+    meta = item.get("metadata") or {}
+    return str(
+        meta.get("ID_урока")
+        or meta.get("id")
+        or item.get("id")
+        or item.get("text", "")[:64]
+    )
+
+
 app = FastAPI(title="Lessons Reranker Service", version="2.0.0")
 
 
@@ -33,5 +44,7 @@ async def rerank(request: RerankRequest) -> dict:
         scored = dict(item)
         scored["rerank_score"] = overlap - distance
         ranked.append(scored)
-    ranked.sort(key=lambda item: item["rerank_score"], reverse=True)
+    # Сортировка с детерминированным тай-брейкером по ID урока,
+    # чтобы при равных rerank_score порядок не плавал между запросами.
+    ranked.sort(key=lambda item: (-item["rerank_score"], _stable_id(item)))
     return {"items": ranked[: request.top_k]}
