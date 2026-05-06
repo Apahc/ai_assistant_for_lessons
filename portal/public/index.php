@@ -199,7 +199,7 @@ $backendUrl = getenv('BACKEND_PUBLIC_URL') ?: 'http://localhost:8000';
           </div>
           <div class="tile">
             <h3>Режимы</h3>
-            <p>Поддерживаются chat, search, document и mail через встроенный frontend-виджет.</p>
+            <p>Поддерживаются Чат, Поиск, Документ и Письмо через встроенный frontend-виджет.</p>
           </div>
           <div class="tile">
             <h3>Сессия</h3>
