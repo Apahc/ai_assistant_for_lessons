@@ -15,10 +15,8 @@ INFORMATION_SHEETS_PATH = os.getenv("INFORMATION_SHEETS_PATH", "/data/informatio
 LETTERS_PATH = os.getenv("LETTERS_PATH", "/data/letters.json")
 GLOSSARY_PATH = os.getenv("GLOSSARY_PATH", "/data/glossary.json")
 
-# Set to 1 to drop Chroma collections and rebuild index after adding/changing corpus files.
-RAG_FORCE_REINDEX = os.getenv("RAG_FORCE_REINDEX", "").strip().lower() in ("1", "true", "yes")
-
 RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
-RETRIEVAL_CANDIDATE_K = int(os.getenv("RETRIEVAL_CANDIDATE_K", "12"))
+# Шире пул кандидатов перед реранжированием — мелкие чанки (глоссарий) чаще попадают в топ.
+RETRIEVAL_CANDIDATE_K = int(os.getenv("RETRIEVAL_CANDIDATE_K", "20"))
 MAX_CHARS = 1400
 OVERLAP = 200

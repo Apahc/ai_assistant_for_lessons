@@ -5,7 +5,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN python -c "from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2; print('Preloading ONNX embedding model during image build...'); ONNXMiniLM_L6_V2()(['warmup']); print('Embedding model cached in image layer.')"
+ARG EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+ENV EMBEDDING_MODEL=${EMBEDDING_MODEL}
+
+RUN python -c "import os; from fastembed import TextEmbedding; m=os.environ['EMBEDDING_MODEL']; print('Preloading', m); list(TextEmbedding(model_name=m).embed(['warmup'])); print('OK')"
 
 COPY . .
 
