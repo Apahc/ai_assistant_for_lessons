@@ -20,6 +20,7 @@ from config import (
     HF_TOKEN,
     LESSONS_PATH,
     LETTERS_PATH,
+    INFORMATION_SHEETS_PATH,
     LLM_API_KEY,
     LLM_BASE_URL,
     LLM_MODEL,
@@ -31,6 +32,83 @@ from config import (
     REPORT_TEMPLATE_SCHEMAS_DIR,
     RETRIEVAL_TOP_K,
 )
+
+
+def canonical_ll_lesson_id(raw: str) -> str | None:
+    s = (raw or "").strip().replace("\u00a0", " ")
+    m = re.match(r"(?i)^LL(\d{1,8})$", s)
+    return f"LL{m.group(1)}" if m else None
+
+
+def extract_title_after_lesson_code(text: str, lid: str) -> str | None:
+    if not text or not lid:
+        return None
+    m = re.search(rf"{re.escape(lid)}\s*[«\"]([^»\"]+)[»\"]", text)
+    if m:
+        return m.group(1).strip()
+    return None
+
+
+def find_lesson_record_in_auxiliary_json(lid: str) -> dict[str, Any] | None:
+    """Карточка из писем/отчётов/инфолистов, если номера нет в lessons.json (только упоминание в тексте)."""
+    paths_ordered: list[Path] = []
+    seen_resolve: set[str] = set()
+    for p in (LETTERS_PATH, REPORTS_PATH, INFORMATION_SHEETS_PATH):
+        if not (p and str(p).strip()):
+            continue
+        path = Path(p)
+        try:
+            rk = str(path.resolve())
+        except OSError:
+            rk = str(path)
+        if rk in seen_resolve:
+            continue
+        seen_resolve.add(rk)
+        paths_ordered.append(path)
+
+    for path in paths_ordered:
+        if not path.is_file():
+            continue
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(raw, list):
+            continue
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            rid = str(item.get("ID_урока") or item.get("lesson_id") or "").strip()
+            if rid and rid.upper() == lid.upper():
+                row = dict(item)
+                row["ID_урока"] = lid
+                row.setdefault(
+                    "_примечание_карточки",
+                    "Данные из документа раздела; состав полей может отличаться от карточки ЕБДИУ.",
+                )
+                return row
+            blob = json.dumps(item, ensure_ascii=False)
+            if lid not in blob:
+                continue
+            row = dict(item)
+            row["ID_урока"] = lid
+            title = (
+                row.get("Наименование_урока")
+                or extract_title_after_lesson_code(row.get("Текст") or "", lid)
+                or extract_title_after_lesson_code(row.get("Тема") or "", lid)
+                or row.get("Тема")
+                or row.get("Имя_шаблона")
+                or row.get("Наименование")
+                or f"Урок {lid}"
+            )
+            row["Наименование_урока"] = str(title).strip()
+            row["_примечание_карточки"] = (
+                "В файле lessons.json нет отдельной записи этого номера; показаны поля связанного документа "
+                "(письмо, отчёт и т. п.), где урок упоминается."
+            )
+            return row
+    return None
+
 
 # ---------------------------------------------------------------------------
 #  Многослойный фильтр иностранных символов
@@ -155,6 +233,32 @@ def strip_remaining_foreign(text: str) -> str:
 # ---------------------------------------------------------------------------
 #  Конец блока фильтра
 # ---------------------------------------------------------------------------
+
+_LESSONS_ONLY_HINT_SUBSTRINGS = (
+    "примеры урок",
+    "пример урок",
+    "уроки из баз",
+    "урок из баз",
+    "список урок",
+    "какие урок",
+    "найди урок",
+    "перечень урок",
+    "описание урок",
+    "карточк урок",
+    "карточки урок",
+    "извлечённ урок",
+    "извлеченн урок",
+    "база урок",
+)
+
+
+def should_restrict_retrieval_to_lessons_only(user_message: str) -> bool:
+    """Эвристика: пользователь просит именно карточки уроков, а не письма/отчёты."""
+    t = (user_message or "").lower().replace("ё", "е")
+    if not t.strip():
+        return False
+    return any(s in t for s in _LESSONS_ONLY_HINT_SUBSTRINGS)
+
 
 Mode = Literal["chat", "search", "document", "mail"]
 
@@ -656,10 +760,27 @@ class BackendService:
         return self._lessons_by_id
 
     def get_full_lesson(self, lesson_id: str) -> dict[str, Any] | None:
-        lid = lesson_id.strip()
-        if not lid:
+        raw_key = (lesson_id or "").strip()
+        if not raw_key:
             return None
-        return self._ensure_lessons_index().get(lid)
+        canonical = canonical_ll_lesson_id(raw_key)
+        lid = canonical or raw_key
+        idx = self._ensure_lessons_index()
+        row = idx.get(lid)
+        if row is None and canonical is None:
+            row = idx.get(raw_key)
+        if row is None:
+            for k, v in idx.items():
+                if k.upper() == lid.upper():
+                    row = v
+                    break
+        if row is not None:
+            return dict(row)
+        if canonical:
+            aux = find_lesson_record_in_auxiliary_json(canonical)
+            if aux:
+                return aux
+        return find_lesson_record_in_auxiliary_json(raw_key)
 
     def lesson_snippets_from_results(self, lesson_results: list[dict]) -> list[LessonSnippet]:
         seen: set[str] = set()
@@ -693,14 +814,15 @@ class BackendService:
             {"role": "user", "content": request.message, "mode": request.mode},
         )
 
-        retrieval = await self.call_rag_safe(
-            {
-                "query": request.message,
-                "mode": request.mode,
-                "top_k": request.top_k,
-                "session_messages": history_messages,
-            }
-        )
+        rag_payload: dict = {
+            "query": request.message,
+            "mode": request.mode,
+            "top_k": request.top_k,
+            "session_messages": history_messages,
+        }
+        if should_restrict_retrieval_to_lessons_only(request.message):
+            rag_payload["corpus_source_types"] = ["lesson"]
+        retrieval = await self.call_rag_safe(rag_payload)
         context = retrieval.get("context", "")
         glossary_hits = mentioned_glossary_entries(request.message, GLOSSARY_PATH)
         if glossary_hits:

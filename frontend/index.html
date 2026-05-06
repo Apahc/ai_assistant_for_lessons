@@ -37,23 +37,35 @@
         <h1>Ассистент раздела "Извлеченные уроки"</h1>
         <span id="sessionBadge"></span>
       </header>
-      <section class="assistant-main">
-        <div class="assistant-messages" id="assistantMessages"></div>
-        <div class="mode-bar wide" id="assistantModeBar">
-          <button class="mode-btn active" data-mode="chat">chat</button>
-          <button class="mode-btn" data-mode="search">search</button>
-          <button class="mode-btn" data-mode="document">document</button>
-          <button class="mode-btn" data-mode="mail">mail</button>
-        </div>
-        <div class="composer">
-          <input id="assistantInput" type="text" placeholder="Сформулируйте запрос по урокам" />
-          <button id="assistantSend" class="send-btn">➤</button>
-        </div>
-      </section>
+      <div class="assistant-body">
+        <aside class="assistant-sidebar" aria-label="История открытых уроков">
+          <div class="assistant-sidebar-inner">
+            <div class="opened-lessons-head">
+              <span class="opened-lessons-title">Открытые уроки</span>
+              <button type="button" class="opened-lessons-clear-btn" title="Очистить историю">Очистить</button>
+            </div>
+            <ul class="opened-lessons-list" id="openedLessonsSidebarList"></ul>
+          </div>
+        </aside>
+        <section class="assistant-main">
+          <div class="assistant-messages" id="assistantMessages"></div>
+          <div class="mode-bar wide" id="assistantModeBar">
+            <button class="mode-btn active" data-mode="chat">chat</button>
+            <button class="mode-btn" data-mode="search">search</button>
+            <button class="mode-btn" data-mode="document">document</button>
+            <button class="mode-btn" data-mode="mail">mail</button>
+          </div>
+          <div class="composer">
+            <input id="assistantInput" type="text" placeholder="Сформулируйте запрос по урокам" />
+            <button id="assistantSend" class="send-btn">➤</button>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
 
   <script src="js/config.js"></script>
+  <script src="js/opened-lessons-history.js"></script>
   <script src="js/api.js"></script>
   <script src="js/chat-widget.js"></script>
 </body>

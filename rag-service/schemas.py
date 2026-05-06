@@ -12,6 +12,8 @@ class RetrieveRequest(BaseModel):
     mode: Mode = "chat"
     top_k: int = Field(default=5, ge=1, le=20)
     session_messages: list[dict[str, Any]] = Field(default_factory=list)
+    # Если задано — поиск только среди указанных типов в общей коллекции (например только lesson).
+    corpus_source_types: list[SourceType] | None = Field(default=None)
 
 
 class RetrievedChunk(BaseModel):
