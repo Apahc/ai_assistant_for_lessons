@@ -4,83 +4,270 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Портал извлеченных уроков</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/demo-styles.css" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
-<body>
-  <header class="portal-header">
-    <div class="brand">РОСАТОМ / Извлеченные уроки</div>
-    <div class="meta">RAG demo page</div>
+<body class="portal-demo">
+  <header class="mock-topbar" role="banner">
+    <div class="mock-topbar__left">
+      <div class="mock-logo" aria-hidden="true"></div>
+      <span class="mock-brand">АСЭ&nbsp;РОСАТОМ</span>
+      <button type="button" class="mock-btn mock-btn--outline mock-btn--sections" disabled>
+        <span class="mock-icon-hamburger" aria-hidden="true"></span>
+        Все разделы
+      </button>
+    </div>
+    <nav class="mock-topbar__center" aria-label="Верхнее меню">
+      <span class="mock-search-icon" aria-hidden="true"></span>
+      <span class="mock-search-pill">Система управления <span class="mock-chevron" aria-hidden="true"></span></span>
+      <a href="#" class="mock-top-link" onclick="return false;">ИСМ</a>
+      <a href="#" class="mock-top-link" onclick="return false;">Социальная поддержка</a>
+      <a href="#" class="mock-top-link" onclick="return false;">Новому сотруднику</a>
+      <a href="#" class="mock-top-link" onclick="return false;">Центр помощи</a>
+    </nav>
+    <div class="mock-topbar__right">
+      <button type="button" class="mock-btn mock-btn--primary" disabled>Обратная связь</button>
+      <button type="button" class="mock-icon-btn" aria-label="Помощь" disabled>?</button>
+      <button type="button" class="mock-icon-btn" aria-label="Приложения" disabled>▦</button>
+    </div>
   </header>
 
-  <main class="portal-main">
-    <aside class="portal-sidebar">
-      <h2>Навигация</h2>
-      <ul>
-        <li>Общее</li>
-        <li class="active">Единая база данных ИУ</li>
-        <li>Библиотека документов</li>
-        <li>Предложить урок</li>
+  <div class="mock-subbar">
+    <nav class="breadcrumbs" aria-label="Хлебные крошки">
+      <span>Главная</span>
+      <span class="bc-sep">→</span>
+      <span>Производственная система «Росатом»</span>
+      <span class="bc-sep">→</span>
+      <span class="bc-current">Извлеченные уроки и уроки</span>
+    </nav>
+  </div>
+
+  <div class="portal-layout">
+    <aside class="portal-sidebar-mock" aria-label="Разделы портала">
+      <ul class="sidebar-list">
+        <li>
+          <button type="button" class="sidebar-link" data-nav-view="general">Общее</button>
+        </li>
+        <li>
+          <button type="button" class="sidebar-link" data-nav-view="database">Единая база данных ИУ</button>
+        </li>
+        <li><span class="sidebar-muted">Интерактивная карта КС</span></li>
+        <li><span class="sidebar-muted">Библиотека документов</span></li>
+        <li><span class="sidebar-muted">Нормативная документация</span></li>
+        <li><span class="sidebar-muted">Источники по формированию ИУ</span></li>
+        <li><span class="sidebar-muted">Цепочка помощи</span></li>
+        <li><span class="sidebar-muted">Предложить урок или улучшения</span></li>
       </ul>
     </aside>
 
-    <section class="portal-content">
-      <div class="hero">
-        <h1>Единая база данных извлеченных уроков</h1>
-        <p>Виджет работает только в домене раздела "Извлеченные уроки" и поддерживает режимы chat, search, document, mail.</p>
-      </div>
-      <div class="cards">
-        <article class="card">
-          <h3>Строительные практики</h3>
-          <p>Поиск по урокам строительства, бетонирования, производительности и организационным решениям.</p>
-        </article>
-        <article class="card">
-          <h3>Шаблонные ответы</h3>
-          <p>Подготовка документа и делового письма на основе найденных уроков.</p>
-        </article>
-        <article class="card">
-          <h3>Контекст страницы</h3>
-          <p>Одна открытая страница = одна активная диалоговая сессия.</p>
-        </article>
-      </div>
-    </section>
-  </main>
+    <div class="portal-main-area">
+      <section id="view-general" class="view-panel general-page">
+        <h1 class="page-title page-title--standalone">Общее</h1>
+        <div class="mock-card mock-card--general">
+          <div class="general-grid">
+            <div class="general-col">
+              <section class="mock-section">
+                <h2 class="mock-h2">О проекте</h2>
+                <p class="mock-p">
+                  Извлечённые уроки отражают систематизированный опыт выполнения работ и управления проектами:
+                  фиксация результатов и отклонений позволяет опираться на накопленные знания при планировании
+                  и реализации последующих мероприятий и снижает риск повторения ошибок.
+                </p>
+                <p class="mock-p">
+                  Материалы раздела поддерживают распространение лучших практик и единообразие подходов в рамках
+                  производственной системы — от выявления причин до внедрения корректирующих действий и контроля эффекта.
+                </p>
+              </section>
+              <section class="mock-section">
+                <h2 class="mock-h2">Извлеченные уроки</h2>
+                <p class="mock-p mock-p--instruction">
+                  Для изучения и ознакомления с извлеченными уроками перейдите на страницу «Единая база данных ИУ».
+                </p>
+                <button type="button" class="mock-outline-btn mock-outline-btn--ghost" disabled>Поиск извлеченных уроков</button>
+              </section>
+              <section class="mock-section">
+                <h2 class="mock-h2">Документация</h2>
+                <ul class="doc-links">
+                  <li><a href="#" onclick="return false;">Инструкция пользователя</a></li>
+                  <li><a href="#" onclick="return false;">Презентация</a></li>
+                  <li><a href="#" onclick="return false;">Настольная книга Руководителя проекта</a></li>
+                </ul>
+              </section>
+            </div>
+            <div class="general-col general-col--aside">
+              <div class="video-placeholder" role="img" aria-label="Видео: управление извлеченными уроками">
+                <div class="video-placeholder__bg" aria-hidden="true">
+                  <svg class="video-waves" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">
+                    <rect width="320" height="180" fill="#ffffff" />
+                    <path fill="none" stroke="#1e88e5" stroke-width="1.25" opacity="0.35" d="M0,95 C53,72 107,118 160,95 C213,72 267,118 320,95" />
+                    <path fill="none" stroke="#1565c0" stroke-width="1.5" opacity="0.45" d="M0,108 C40,88 80,128 120,108 C160,88 200,128 240,108 C280,88 300,118 320,108" />
+                    <path fill="none" stroke="#42a5f5" stroke-width="1.15" opacity="0.4" d="M0,78 C64,58 128,98 192,78 C224,68 256,88 320,78" />
+                  </svg>
+                </div>
+                <p class="video-placeholder__heading">Управление извлеченными уроками и улучшениями</p>
+                <div class="video-placeholder__mid">
+                  <button type="button" class="video-play" disabled aria-hidden="true">
+                    <span class="video-play__triangle" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div class="video-placeholder__controls" aria-hidden="true">
+                  <span class="video-progress"><span class="video-progress__fill"></span></span>
+                  <span class="video-time">05:24</span>
+                </div>
+              </div>
+              <section class="contact-card">
+                <h3 class="mock-h3">Координатор уроков и улучшений</h3>
+                <p class="contact-name">Иноземцев Александр Михайлович</p>
+                <p class="contact-line">
+                  <a href="mailto:a.inozemtsev@ase-ec.ru">a.inozemtsev@ase-ec.ru</a>
+                </p>
+                <p class="contact-line muted">+7 (915) 110-40-26 доб. 74485</p>
+                <p class="contact-line muted">г. Москва, ул. Дмитровское шоссе, д. 2, стр. 1</p>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <button class="chat-launcher" id="chatLauncher" aria-label="Открыть ассистента">ИИ</button>
-
-  <div class="chat-wrapper" id="chatWrapper">
-    <div class="chat-header">
-      <span>Ассистент по извлеченным урокам</span>
-      <div class="chat-actions">
-        <button id="expandChat" class="icon-btn" title="Расширить">⤢</button>
-        <button id="closeChat" class="icon-btn" title="Закрыть">×</button>
-      </div>
-    </div>
-    <div class="messages" id="messages"></div>
-    <div class="mode-bar" id="modeBar">
-      <button class="mode-btn active" data-mode="chat">Чат</button>
-      <button class="mode-btn" data-mode="search">Поиск</button>
-      <button class="mode-btn" data-mode="document">Документ</button>
-      <button class="mode-btn" data-mode="mail">Письмо</button>
-    </div>
-    <div class="composer">
-      <input id="messageInput" type="text" placeholder="Сформулируйте запрос по урокам" />
-      <button id="sendBtn" class="send-btn">➤</button>
+      <section id="view-database" class="view-panel database-page" hidden>
+        <h1 class="page-title page-title--standalone">Единая база данных ИУ</h1>
+        <div class="database-split">
+          <div class="database-split__main mock-card mock-card--database">
+            <div class="db-search-wrap">
+              <span class="db-search-icon" aria-hidden="true">⌕</span>
+              <input type="search" class="db-search-input" placeholder="Поиск извлеченных уроков" disabled aria-disabled="true" />
+            </div>
+            <div class="lesson-cards">
+              <article class="lesson-card">
+                <span class="lesson-tag">Бетонирование</span>
+                <h3 class="lesson-card-title">Бетонирование балок Б-1 помещений теплообменников СПОТ на энергоблоке №2 Нововоронежской АЭС-2</h3>
+                <p class="lesson-meta">
+                  Внесен: 22.02.2026 · ID: LL64784 · Стадия: Реализация улучшения
+                </p>
+                <p class="lesson-card-desc">
+                  Срыв сроков бетонирования перекрытия помещений теплообменников СПОТ.
+                </p>
+                <dl class="lesson-details">
+                  <div><dt>Этап</dt><dd>Основной период</dd></div>
+                  <div><dt>Проект</dt><dd>Нововоронежская АЭС</dd></div>
+                  <div><dt>Вид оборудования</dt><dd>СПОТ</dd></div>
+                  <div><dt>Процесс</dt><dd>Обеспечение производства. Управление эффективностью.</dd></div>
+                </dl>
+                <ul class="lesson-checks">
+                  <li>Отчет об улучшении</li>
+                  <li>Ответ эксперта</li>
+                </ul>
+                <div class="lesson-card-actions">
+                  <button type="button" class="mock-btn mock-btn--primary mock-btn--sm" disabled>Смотреть урок</button>
+                  <a href="#" class="mock-inline-link" onclick="return false;">Заключение эксперта</a>
+                </div>
+              </article>
+              <article class="lesson-card">
+                <span class="lesson-tag">Организация</span>
+                <h3 class="lesson-card-title">Внедрение технологий 5С на площадке строительства</h3>
+                <p class="lesson-meta">Внесен: 02.02.2026 · ID: LL3891 · Стадия: Принят</p>
+                <p class="lesson-card-desc">Организация рабочих мест и визуальный контроль на площадке.</p>
+                <dl class="lesson-details">
+                  <div><dt>Этап</dt><dd>Подготовка</dd></div>
+                  <div><dt>Проект</dt><dd>Корпоративная программа</dd></div>
+                  <div><dt>Вид оборудования</dt><dd>—</dd></div>
+                  <div><dt>Процесс</dt><dd>Организация труда</dd></div>
+                </dl>
+                <ul class="lesson-checks">
+                  <li>Отчет об улучшении</li>
+                  <li>Ответ эксперта</li>
+                </ul>
+                <div class="lesson-card-actions">
+                  <button type="button" class="mock-btn mock-btn--primary mock-btn--sm" disabled>Смотреть урок</button>
+                  <a href="#" class="mock-inline-link" onclick="return false;">Заключение эксперта</a>
+                </div>
+              </article>
+              <article class="lesson-card">
+                <span class="lesson-tag">Поставки</span>
+                <h3 class="lesson-card-title">Согласование поставок длинномера при ограничении проезда</h3>
+                <p class="lesson-meta">Внесен: 28.01.2026 · ID: LL3702 · Стадия: Черновик</p>
+                <p class="lesson-card-desc">Согласование графика подачи грузов на стройплощадку.</p>
+                <dl class="lesson-details">
+                  <div><dt>Этап</dt><dd>Логистика</dd></div>
+                  <div><dt>Проект</dt><dd>Склад временного хранения</dd></div>
+                  <div><dt>Вид оборудования</dt><dd>Крановые установки</dd></div>
+                  <div><dt>Процесс</dt><dd>Поставка ТМЦ</dd></div>
+                </dl>
+                <ul class="lesson-checks">
+                  <li>Отчет об улучшении</li>
+                  <li>Ответ эксперта</li>
+                </ul>
+                <div class="lesson-card-actions">
+                  <button type="button" class="mock-btn mock-btn--primary mock-btn--sm" disabled>Смотреть урок</button>
+                  <a href="#" class="mock-inline-link" onclick="return false;">Заключение эксперта</a>
+                </div>
+              </article>
+              <article class="lesson-card">
+                <span class="lesson-tag">Безопасность</span>
+                <h3 class="lesson-card-title">Идентификация зон повышенного риска при работах на высоте</h3>
+                <p class="lesson-meta">Внесен: 15.01.2026 · ID: LL3644 · Стадия: Принят</p>
+                <p class="lesson-card-desc">Маркировка и ограждение опасных зон при монтаже металлоконструкций.</p>
+                <dl class="lesson-details">
+                  <div><dt>Этап</dt><dd>Эксплуатация</dd></div>
+                  <div><dt>Проект</dt><dd>Реконструкция объекта</dd></div>
+                  <div><dt>Вид оборудования</dt><dd>Средства подмащения</dd></div>
+                  <div><dt>Процесс</dt><dd>Охрана труда</dd></div>
+                </dl>
+                <ul class="lesson-checks">
+                  <li>Отчет об улучшении</li>
+                  <li>Ответ эксперта</li>
+                </ul>
+                <div class="lesson-card-actions">
+                  <button type="button" class="mock-btn mock-btn--primary mock-btn--sm" disabled>Смотреть урок</button>
+                  <a href="#" class="mock-inline-link" onclick="return false;">Заключение эксперта</a>
+                </div>
+              </article>
+            </div>
+          </div>
+          <aside class="database-split__aside" aria-label="ИИ-помощник">
+            <div class="chat-wrapper chat-wrapper--embedded open" id="chatWrapper">
+              <div class="chat-header chat-header--embedded">
+                <div class="chat-header-text">
+                  <span class="chat-kicker">Найдено: 56 уроков</span>
+                  <span class="chat-title">ИИ-помощник</span>
+                </div>
+                <div class="chat-header-actions">
+                  <button type="button" id="expandChat" class="icon-btn icon-btn--embed" title="Раскрыть">⤢</button>
+                  <button type="button" class="chat-filter-link" disabled>Фильтр</button>
+                </div>
+              </div>
+              <div class="messages" id="messages"></div>
+              <div class="mode-bar mode-bar--embed" id="modeBar">
+                <button class="mode-btn" data-mode="document">Документы</button>
+                <button class="mode-btn" data-mode="mail">Письмо</button>
+                <button class="mode-btn active" data-mode="chat">Чат</button>
+                <button class="mode-btn" data-mode="search">Поиск</button>
+              </div>
+              <div class="composer">
+                <input id="messageInput" type="text" placeholder="Сформулируйте запрос по урокам" />
+                <button id="sendBtn" class="send-btn">➤</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
     </div>
   </div>
 
   <div class="assistant-overlay" id="assistantOverlay">
-    <div class="assistant-shell">
-      <header class="assistant-header">
-        <button id="assistantBack" class="icon-btn">←</button>
-        <h1>Ассистент раздела "Извлеченные уроки"</h1>
-        <span id="sessionBadge"></span>
+    <div class="assistant-shell assistant-shell--portal">
+      <header class="assistant-header assistant-header--portal">
+        <button type="button" id="assistantBack" class="icon-btn assistant-back-btn" title="К компактному виду">←</button>
+        <h1 class="assistant-portal-title">Ассистент раздела «Извлеченные уроки»</h1>
       </header>
       <div class="assistant-body">
-        <aside class="assistant-sidebar" aria-label="История открытых уроков">
+        <aside class="assistant-sidebar" aria-label="История запросов">
           <div class="assistant-sidebar-inner">
             <div class="opened-lessons-head">
-              <span class="opened-lessons-title">Открытые уроки</span>
+              <span class="opened-lessons-title">История запросов</span>
               <button type="button" class="opened-lessons-clear-btn" title="Очистить историю">Очистить</button>
             </div>
             <ul class="opened-lessons-list" id="openedLessonsSidebarList"></ul>
@@ -89,13 +276,13 @@
         <section class="assistant-main">
           <div class="assistant-messages" id="assistantMessages"></div>
           <div class="mode-bar wide" id="assistantModeBar">
+            <button class="mode-btn" data-mode="document">Документы</button>
+            <button class="mode-btn" data-mode="mail">Письмо</button>
             <button class="mode-btn active" data-mode="chat">Чат</button>
             <button class="mode-btn" data-mode="search">Поиск</button>
-            <button class="mode-btn" data-mode="document">Документ</button>
-            <button class="mode-btn" data-mode="mail">Письмо</button>
           </div>
-          <div class="composer">
-            <input id="assistantInput" type="text" placeholder="Сформулируйте запрос по урокам" />
+          <div class="composer composer--modal">
+            <input id="assistantInput" type="text" placeholder="Что вы хотите найти?" />
             <button id="assistantSend" class="send-btn">➤</button>
           </div>
         </section>
@@ -103,6 +290,7 @@
     </div>
   </div>
 
+  <script src="js/demo-portal.js"></script>
   <script src="js/config.js"></script>
   <script src="js/opened-lessons-history.js"></script>
   <script src="js/api.js"></script>

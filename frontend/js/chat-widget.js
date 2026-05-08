@@ -10,7 +10,6 @@ const assistantBack = document.getElementById('assistantBack');
 const assistantMessages = document.getElementById('assistantMessages');
 const assistantSend = document.getElementById('assistantSend');
 const assistantInput = document.getElementById('assistantInput');
-const sessionBadge = document.getElementById('sessionBadge');
 
 let sessionId = null;
 let currentMode = 'chat';
@@ -149,6 +148,10 @@ function applyChatUiLayout(layout) {
     chatWrapper?.classList.remove('open');
     assistantOverlay?.classList.remove('open');
     document.body.classList.remove('overlay-open');
+  }
+  /* Встроенный виджет на demo.html всегда остаётся развёрнутым в колонке. */
+  if (chatWrapper?.classList.contains('chat-wrapper--embedded')) {
+    chatWrapper.classList.add('open');
   }
 }
 
@@ -441,9 +444,6 @@ async function ensureSession() {
   const session = await apiService.createSession();
   sessionId = session.session_id;
   sessionBootstrapped = true;
-  if (sessionBadge) {
-    sessionBadge.textContent = `session ${sessionId.slice(0, 8)}`;
-  }
   return sessionId;
 }
 
@@ -454,9 +454,6 @@ async function tryRestoreSessionById(saved) {
     if (data.status !== 'active') return false;
     sessionId = data.session_id;
     sessionBootstrapped = true;
-    if (sessionBadge) {
-      sessionBadge.textContent = `session ${sessionId.slice(0, 8)}`;
-    }
     messages.innerHTML = '';
     assistantMessages.innerHTML = '';
     const rawMsgs = mergeServerAndTranscript(data.messages, sessionId);
