@@ -48,8 +48,11 @@ services:
       RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K}
       LESSONS_PATH: ${LESSONS_PATH:-/data/lessons.json}
       GLOSSARY_PATH: ${GLOSSARY_PATH:-/data/glossary.json}
+      DOCUMENT_TEMPLATES_DIR: ${DOCUMENT_TEMPLATES_DIR:-/samples/documents}
+      LETTER_TEMPLATES_DIR: ${LETTER_TEMPLATES_DIR:-/samples/letters}
     volumes:
       - ./data:/data:ro
+      - ./samples:/samples:ro
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:

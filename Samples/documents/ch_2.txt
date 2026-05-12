@@ -1,0 +1,154 @@
+[
+{
+  "document_name": {
+    "description": "Формат заявки на документирование урока (улучшения)",
+    "required": true,
+    "type": "string"
+  },
+{
+  "application_id": {
+    "description": "Номер заявки",
+    "required": true,
+    "type": "string"
+  },
+  "full_name": {
+    "description": "Полное наименование урока (улучшения)",
+    "required": true,
+    "type": "string"
+  },
+  "implementation_date": {
+    "description": "Дата реализации",
+    "required": true,
+    "type": "string",
+    "format": "date"
+  },
+  "construction_stage": {
+    "description": "Этап сооружения",
+    "required": true,
+    "type": "string"
+  },
+  "functional_process": {
+    "description": "Функциональный процесс",
+    "required": true,
+    "type": "string"
+  },
+  "key_event": {
+    "description": "Ключевое событие",
+    "required": true,
+    "type": "string"
+  },
+  "project_name": {
+    "description": "Проект сооружения",
+    "required": true,
+    "type": "string"
+  },
+  "participant_1_full_name": {
+    "description": "ФИО",
+    "required": true,
+    "type": "string"
+  },
+  "participant_1_organization": {
+    "description": "Организация",
+    "required": true,
+    "type": "string"
+  },
+  "participant_1_position": {
+    "description": "Должность",
+    "required": true,
+    "type": "string"
+  },
+  "participant_1_email": {
+    "description": "Электронная почта",
+    "required": true,
+    "type": "string",
+    "format": "email"
+  },
+  "participant_1_phone": {
+    "description": "Телефон",
+    "required": true,
+    "type": "string"
+  },
+  "participant_1_role": {
+    "description": "Роль",
+    "required": true,
+    "type": "string"
+  },
+  "participant_2_full_name": {
+    "description": "ФИО",
+    "required": false,
+    "type": "string"
+  },
+  "participant_2_organization": {
+    "description": "Организация",
+    "required": false,
+    "type": "string"
+  },
+  "participant_2_position": {
+    "description": "Должность",
+    "required": false,
+    "type": "string"
+  },
+  "participant_2_email": {
+    "description": "Электронная почта",
+    "required": false,
+    "type": "string",
+    "format": "email"
+  },
+  "participant_2_phone": {
+    "description": "Телефон",
+    "required": false,
+    "type": "string"
+  },
+  "participant_2_role": {
+    "description": "Роль",
+    "required": false,
+    "type": "string"
+  },
+  "participant_3_full_name": {
+    "description": "ФИО",
+    "required": false,
+    "type": "string"
+  },
+  "participant_3_organization": {
+    "description": "Организация",
+    "required": false,
+    "type": "string"
+  },
+  "participant_3_position": {
+    "description": "Должность",
+    "required": false,
+    "type": "string"
+  },
+  "participant_3_email": {
+    "description": "Электронная почта",
+    "required": false,
+    "type": "string",
+    "format": "email"
+  },
+  "participant_3_phone": {
+    "description": "Телефон",
+    "required": false,
+    "type": "string"
+  },
+  "participant_3_role": {
+    "description": "Роль",
+    "required": false,
+    "type": "string"
+  },
+  "lesson_description": {
+    "description": "Описание",
+    "required": true,
+    "type": "string"
+  },
+  "replication_area": {
+    "description": "Область тиражирования",
+    "required": false,
+    "type": "string"
+  },
+  "additional_comments": {
+    "description": "Комментарии участников формирования улучшения, которые могут быть полезны при тиражировании",
+    "required": false,
+    "type": "string"
+  }
+}
+]

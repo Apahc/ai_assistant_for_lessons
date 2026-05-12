@@ -1,0 +1,72 @@
+[
+{
+  "document": {
+    "description": "Формат служебной записки",
+    "required": false,
+    "type": "string"
+  },
+{
+  "document_name": {
+    "description": "Служебная записка",
+    "required": true,
+    "type": "string"
+  },
+  "number": {
+    "description": "Номер служебной записки",
+    "required": false,
+    "type": "string",
+    "format": "email"
+  },
+  "date": {
+    "description": "Дата записки",
+    "required": false,
+    "type": "string"
+  },
+  "to_sing": {
+    "description": "Кому назначена служебная записка",
+    "required": false,
+    "type": "string"
+  },
+  "organization": {
+    "description": "АО АСЭ Отраслевой центр планирования и контроля сооружения объектов",
+    "required": true,
+    "type": "string"
+  },
+  "topic": {
+    "description": "тема записки",
+    "required": false,
+    "type": "string"
+  },
+  "text": {
+    "description": "Содержание записки",
+    "required": false,
+    "type": "string"
+  },
+"application": {
+    "description": "Приложение",
+    "required": false,
+    "type": "string",
+    "example": "Образец экспертного заключения на 1 л. в 1 экз."
+  },
+"signatory_position_1": {
+    "description": "Директор",
+    "required": true,
+    "type": "string"
+  },
+"signatory_full_name_1": {
+    "description": "Д.В. Шепелев",
+    "required": true,
+    "type": "string"
+  },
+"signatory_full_name_2": {
+    "description": "Иноземцев Александр Михайлович",
+    "required": true,
+    "type": "string"
+  },
+ "signatory_phone": {
+    "description": "7-44-85",
+    "required": true,
+    "type": "string"
+  },
+}
+]

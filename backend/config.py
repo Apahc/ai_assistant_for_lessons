@@ -18,3 +18,7 @@ REPORTS_PATH = os.getenv("REPORTS_PATH", "/data/reports.json").strip()
 INFORMATION_SHEETS_PATH = os.getenv("INFORMATION_SHEETS_PATH", "/data/information_sheets.json").strip()
 # Каталог JSON-схем полей (подписи для промпта и синхронизация с БД memory-service).
 REPORT_TEMPLATE_SCHEMAS_DIR = os.getenv("REPORT_TEMPLATE_SCHEMAS_DIR", "").strip()
+# Папка с шаблонами документов (ch_2.txt, ch_9.txt и т.п.) — каждый файл задаёт
+# структуру одного документа (description = подпись поля, required = обязательность).
+DOCUMENT_TEMPLATES_DIR = os.getenv("DOCUMENT_TEMPLATES_DIR", "/samples/documents").strip()
+LETTER_TEMPLATES_DIR = os.getenv("LETTER_TEMPLATES_DIR", "/samples/letters").strip()

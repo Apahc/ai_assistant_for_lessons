@@ -14,8 +14,19 @@ from pydantic import BaseModel, Field
 from glossary_terms import mentioned_glossary_entries, prepend_glossary_block
 from prompts import PROMPT_TEMPLATES, SYSTEM_PROMPT
 from report_template_catalog import load_kind_to_ordered_labels
+from document_templates import (
+    load_document_templates,
+    load_letter_templates,
+    render_focused_letter_block,
+    render_focused_template_block,
+    render_letter_block,
+    render_template_block,
+    select_template,
+)
 
 from config import (
+    DOCUMENT_TEMPLATES_DIR,
+    LETTER_TEMPLATES_DIR,
     GLOSSARY_PATH,
     HF_TOKEN,
     LESSONS_PATH,
@@ -312,6 +323,22 @@ class BackendService:
         self._report_template_field_labels: dict[str, list[tuple[str, str]]] = load_kind_to_ordered_labels(
             schemas_dir
         )
+        self._document_templates: dict[str, dict[str, Any]] = load_document_templates(
+            Path(DOCUMENT_TEMPLATES_DIR)
+        )
+        self._document_templates_block: str = render_template_block(
+            self._document_templates,
+            Path(REPORTS_PATH),
+            max_examples=0,  # без JSON-примеров, чтобы уложиться в TPM Groq
+        )
+        self._letter_templates: dict[str, dict[str, Any]] = load_letter_templates(
+            Path(LETTER_TEMPLATES_DIR)
+        )
+        self._letter_templates_block: str = render_letter_block(
+            self._letter_templates,
+            Path(LETTERS_PATH),
+            max_examples=0,  # без JSON-примеров, чтобы уложиться в TPM Groq
+        )
         if HF_TOKEN:
             try:
                 self.hf_client = InferenceClient(provider=LLM_PROVIDER, token=HF_TOKEN)
@@ -429,6 +456,15 @@ class BackendService:
                 "meta_count": 0,
             }
 
+    @staticmethod
+    def _truncate_context(text: str, *, max_chars: int) -> str:
+        if not text:
+            return text
+        if len(text) <= max_chars:
+            return text
+        head = text[:max_chars].rstrip()
+        return head + "\n…[контекст усечён, чтобы уложиться в лимит модели]"
+
     def history_to_text(self, messages: list[dict]) -> str:
         if not messages:
             return "История пока пустая."
@@ -436,6 +472,32 @@ class BackendService:
 
     def build_prompt(self, mode: Mode, *, message: str, history: str, context: str, meta_context: str) -> str:
         template = PROMPT_TEMPLATES.get(mode, PROMPT_TEMPLATES["chat"])
+        # Для document/mail режим — жёстко ограничиваем суммарный размер контекста,
+        # чтобы не упереться в context_length_exceeded LLM. Шаблоны и так занимают
+        # несколько тысяч токенов; полный retrieval из 5 карточек × десятки полей
+        # выводит запрос за лимит модели.
+        if mode in ("document", "mail"):
+            context = self._truncate_context(context, max_chars=4000)
+            meta_context = self._truncate_context(meta_context, max_chars=800)
+            history = self._truncate_context(history, max_chars=800)
+        # Для document — фокусируем блок шаблонов: при однозначном совпадении
+        # тащим JSON-примеры ТОЛЬКО для нужного шаблона, иначе — только список заголовков.
+        document_block = self._document_templates_block
+        letter_block = self._letter_templates_block
+        if mode == "document":
+            selected = select_template(message, self._document_templates)
+            document_block = render_focused_template_block(
+                self._document_templates,
+                selected,
+                Path(REPORTS_PATH),
+                max_examples=2 if selected else 0,
+            )
+        if mode == "mail":
+            letter_block = render_focused_letter_block(
+                self._letter_templates,
+                Path(LETTERS_PATH),
+                max_examples=1,
+            )
         try:
             return template.format(
                 message=message,
@@ -444,14 +506,26 @@ class BackendService:
                 meta_context=meta_context or "Мета-контекст не найден.",
                 letter_formats=self.letter_formats_block(),
                 report_formats=self.report_formats_block(),
+                document_templates=document_block,
+                letter_templates=letter_block,
             )
         except KeyError:
-            return template.format(
-                message=message,
-                history=history,
-                context=context,
-                meta_context=meta_context or "Мета-контекст не найден.",
-            )
+            try:
+                return template.format(
+                    message=message,
+                    history=history,
+                    context=context,
+                    meta_context=meta_context or "Мета-контекст не найден.",
+                    document_templates=document_block,
+                    letter_templates=letter_block,
+                )
+            except KeyError:
+                return template.format(
+                    message=message,
+                    history=history,
+                    context=context,
+                    meta_context=meta_context or "Мета-контекст не найден.",
+                )
 
     def normalize_generated_text(self, generated: object) -> str | None:
         if isinstance(generated, str):
@@ -669,6 +743,10 @@ class BackendService:
             meta_context=meta_context,
         )
 
+        self.logger.info(
+            "LLM call mode=%s prompt_chars=%d (~%d tokens approx)",
+            mode, len(prompt), len(prompt) // 4,
+        )
         generated = None
         if LLM_BASE_URL:
             try:
