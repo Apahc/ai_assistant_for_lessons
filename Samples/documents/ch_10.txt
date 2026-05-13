@@ -1,0 +1,132 @@
+[
+{
+  "document": {
+    "description": "Форма протокола о закрытии урока",
+    "required": true,
+    "type": "string"
+  },
+  "approval": {
+    "description": "Утверждаю:",
+    "required": true,
+    "type": "string"
+  },
+  "approving_position": {
+    "description": "Директор ОЦПиКСО, Владелец процесса управления уроками и улучшениями АО АСЭ",
+    "required": true,
+    "type": "string"
+  },
+  "approving_full_name": {
+    "description": "Д.В.Шепелев",
+    "required": true,
+    "type": "string"
+  },
+"approving_date": {
+    "description": "ДД.ММ.ГГГ",
+    "required": false,
+    "type": "string"
+  },
+  "document_name": {
+    "description": "Протокол о закрытии урока",
+    "required": true,
+    "type": "string"
+  },
+{
+  "line_number": {
+    "description": "№ п/п",
+    "required": true,
+    "type": "string",
+    "example": "1"
+  },
+  "lesson_name": {
+    "description": "Наименование урока",
+    "required": true,
+    "type": "string",
+    "example": "Оптимизация процесса согласования чертежей на этапе монтажа"
+  },
+  "ebdiu_id": {
+    "description": "№ в ЕБДИУ, идентификационный",
+    "required": true,
+    "type": "string",
+    "example": "LL-2026-045"
+  },
+  "entry_date": {
+    "description": "Дата внесения в ЕБДИУ",
+    "required": true,
+    "type": "string",
+    "format": "date",
+    "example": "2026-03-15"
+  },
+  "source_name": {
+    "description": "Источник, наименование",
+    "required": true,
+    "type": "string",
+    "example": "Проектный офис АЭС «Аккую»"
+  },
+  "project_name": {
+    "description": "Название Проекта, площадки, подразделения",
+    "required": true,
+    "type": "string",
+    "example": "АЭС «Аккую», площадка №1, Управление качеством"
+  },
+  "practical_experience_description": {
+    "description": "Описание опыта для практического использования",
+    "required": true,
+    "type": "string",
+    "example": "Применение шаблона КЖ позволило сократить время согласования на 40%"
+  },
+  "experts_conclusion": {
+    "description": "Заключение Экспертов",
+    "required": true,
+    "type": "string",
+    "example": "Опыт признан успешным, рекомендации выполнены в полном объеме"
+  },
+  "closure_decision": {
+    "description": "Принято решение о закрытии урока",
+    "required": true,
+    "type": "string",
+    "example": "Урок закрыть, так как все мероприятия реализованы"
+  },
+  "distribution_method": {
+    "description": "Решение о способе распространения информации об извлеченном уроке",
+    "required": true,
+    "type": "string",
+    "example": "Публикация в ЕБДИУ, рассылка по проектным офисам, включение в базу знаний"
+  },
+"application": {
+    "description": "Приложение",
+    "required": false,
+    "type": "string",
+    "example": "Карточка урока из ЕБДИУ LL9053 на 1 л.""
+  },
+"signatory_position_1": {
+    "description": "Советник директора ОЦПиКСО, руководитель команды реализации улучшений",
+    "required": false,
+    "type": "string"
+  },
+"signatory_full_name_1": {
+    "description": "А.К. Полушкин",
+    "required": false,
+    "type": "string"
+  },
+"signatory_position_2": {
+    "description": "Начальник ИАУ, Координатор уроков и улучшений",
+    "required": false,
+    "type": "string"
+  },
+"signatory_full_name_2": {
+    "description": "А.М. Иноземцев",
+    "required": false,
+    "type": "string"
+  },
+"signatory_position_3": {
+    "description": "Начальник УОМиУ",
+    "required": false,
+    "type": "string"
+  },
+"signatory_full_name_3": {
+    "description": "В.Е. Карабанов",
+    "required": false,
+    "type": "string"
+  }
+}
+]
