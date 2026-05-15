@@ -16,11 +16,13 @@
 
 Это не общий AI-помощник по всему сайту. Система работает только в домене раздела "Извлеченные уроки" и отвечает по:
 
-- содержимому `lessons.json`
-- дополнительной метаинформации раздела, если она подключена
+- содержимому `lessons.json` (основной корпус уроков)
+- справочнику терминов `glossary.json` (подмешивается в контекст при упоминаниях в запросе)
+- связанным JSON-данным для режимов документов и писем: `reports.json`, `information_sheets.json`, `letters.json`, а также схемам шаблонов отчётов в `data/report_template_schemas/`
+- дополнительной метаинформации раздела (`portal_meta.txt`, если файл есть в `data/`)
 - истории текущего диалога в рамках одной открытой страницы
 
-Пользователь открывает страницу раздела на портале, запускает виджет и работает с одним активным диалогом. При перезагрузке страницы создается новая `session_id`, а завершенный или прерванный диалог сохраняется как история.
+Пользователь открывает страницу раздела на портале, запускает виджет и работает с одним активным диалогом. При обычной перезагрузке страницы виджет создаёт новую `session_id` на backend. Исключение: при возврате со страницы карточки урока (`lesson.html`) сессия восстанавливается из `sessionStorage`, если она ещё активна на сервере. Завершённый или прерванный диалог сохраняется как история в Postgres.
 
 ## Режимы работы
 
@@ -42,7 +44,8 @@
 - `memory-service/` - работа с активной сессией, историей и логами
 - `embed-service/` - сервис эмбеддингов
 - `reranker-service/` - сервис реранкинга
-- `data/` - данные, включая `lessons.json`, `raw_data/` и локальную персистентность Chroma
+- `data/` - JSON-данные раздела, схемы шаблонов, при необходимости `portal_meta.txt`; локальная персистентность Chroma в `data/chroma_db/`
+- `samples/` - текстовые шаблоны для режимов `document` и `mail` (монтируются в backend как `/samples`)
 
 Вспомогательная инфраструктура поднимается в compose:
 
@@ -54,24 +57,29 @@
 
 1. Пользователь открывает портал на странице раздела "Извлеченные уроки".
 2. В портале встроен frontend-виджет.
-3. Frontend создает новую `session_id` через backend.
+3. Frontend получает `session_id`: при обычной загрузке страницы вызывается `POST /api/v1/sessions`; при возврате с `lesson.html` виджет пытается восстановить ранее сохранённую активную сессию через `GET /api/v1/sessions/{session_id}`.
 4. Пользователь выбирает режим и отправляет сообщение.
 5. Backend получает историю сессии из `memory-service`.
 6. Backend отправляет запрос в `rag-service`.
 7. `rag-service` строит retrieval-запрос, вызывает `embed-service`, ищет данные в Chroma, применяет `reranker-service` и возвращает текстовый контекст.
-8. Backend собирает промпт по выбранному режиму и обращается к LLM.
+8. Backend при необходимости подмешивает фрагменты глоссария в контекст, собирает промпт по выбранному режиму и обращается к LLM.
 9. Backend сохраняет сообщение пользователя и ответ ассистента через `memory-service`.
-10. Frontend показывает пользователю только итоговый текстовый ответ.
+10. Frontend показывает ответ и при необходимости ссылки на уроки (поле `lessons` в ответе API), в том числе для перехода на `lesson.html`.
 
 ## Хранение данных и памяти
 
 - Активная текущая сессия хранится в `Redis`
 - История диалогов и request logs сохраняются в `Postgres`
 - Векторный индекс хранится в `Chroma`
-- Основной корпус данных - `data/lessons.json`
+- Основной корпус уроков - `data/lessons.json`
+- Остальные JSON в `data/` и каталог `samples/` монтируются read-only; приложение не должно их перезаписывать
 - `data/raw_data/` не используется рантаймом и не должен изменяться приложением
 
 `data/lessons.json` и `data/raw_data/` считаются неприкосновенными источниками данных. Приложение не должно их переписывать.
+
+### Данные в репозитории
+
+В `.gitignore` исключены тяжёлые или локальные артефакты: `data/lessons.json`, `data/raw_data/`, `data/chroma_db/`. После клонирования нужно положить свой `lessons.json` (и при необходимости пересобрать индекс в Chroma согласно вашему пайплайну). Остальные JSON в `data/` в репозитории могут присутствовать как примеры схем.
 
 ## Как сейчас устроена связь с LLM
 
@@ -153,10 +161,28 @@ CHROMA_COLLECTION=lessons
 
 LESSONS_PATH=/data/lessons.json
 PORTAL_META_PATH=/data/portal_meta.txt
+GLOSSARY_PATH=/data/glossary.json
+REPORTS_PATH=/data/reports.json
+INFORMATION_SHEETS_PATH=/data/information_sheets.json
+LETTERS_PATH=/data/letters.json
+REPORT_TEMPLATE_SCHEMAS_DIR=/data/report_template_schemas
+
+# Шаблоны режимов document / mail (пути внутри контейнера backend)
+DOCUMENT_TEMPLATES_DIR=/samples/documents
+LETTER_TEMPLATES_DIR=/samples/letters
 
 RETRIEVAL_TOP_K=5
 RETRIEVAL_CANDIDATE_K=12
 SESSION_TTL_SECONDS=14400
+
+# Опционально: таймаут HTTP к LLM, модель эмбеддингов для embed-service
+LLM_TIMEOUT_SECONDS=120
+EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+
+# При необходимости переопределите учётные данные Postgres (см. docker-compose)
+# POSTGRES_DB=lessons
+# POSTGRES_USER=lessons
+# POSTGRES_PASSWORD=lessons
 ```
 
 Для генерации также настройте один из вариантов:
@@ -173,11 +199,15 @@ docker compose up --build
 После старта сервисы доступны так:
 
 - `http://localhost:8080` - портал
-- `http://localhost:8081/demo.html` - frontend-виджет напрямую
-- `http://localhost:8000/health` - backend
+- `http://localhost:8081/` или `http://localhost:8081/demo.html` - frontend-виджет напрямую (см. `frontend/Dockerfile`, по умолчанию отдаётся `demo.html`)
+- `http://localhost:8081/index.html` - компактный вариант виджета без макета портала
+- `http://localhost:8000/health` и `http://localhost:8000/api/v1/health` - backend (агрегированный статус)
+- `http://localhost:8000/health/ready` - readiness для Docker healthcheck (503, если memory или rag не в порядке)
 - `http://localhost:8002/health` - rag-service
-- `http://localhost:8005/health` - memory-service
-- `http://localhost:8006` - Chroma
+- `http://localhost:8005/health/ready` - memory-service
+- `http://localhost:8003/health/ready` - embed-service
+- `http://localhost:8004/health` - reranker-service
+- `http://localhost:8006` - HTTP API Chroma
 
 ## Как проверить минимальный сценарий
 
@@ -193,7 +223,7 @@ docker compose up --build
 
 ## API верхнего уровня
 
-Для frontend основная точка входа сейчас одна:
+Для текущего виджета основная точка входа - `POST /message` (см. `frontend/js/api.js`). Дублирующий контракт с расширенным телом ответа - `POST /api/v1/respond`.
 
 ### POST `/message`
 
@@ -203,39 +233,69 @@ docker compose up --build
 {
   "session_id": "string",
   "mode": "chat",
-  "message": "Какие уроки есть по производительности бетонирования?"
+  "message": "Какие уроки есть по производительности бетонирования?",
+  "top_k": 5
 }
 ```
+
+Поле `top_k` необязательно (по умолчанию берётся из настроек backend).
 
 Ответ:
 
 ```json
 {
-  "text": "..."
+  "text": "...",
+  "lessons": [
+    {
+      "id": "string",
+      "title": "string",
+      "text": "string",
+      "lesson_id": "LL123"
+    }
+  ]
 }
 ```
 
-Также backend поддерживает:
+`lessons` используется UI для ссылок на карточки уроков.
+
+### POST `/api/v1/respond`
+
+Тот же запрос, что и для `/message`. Ответ:
+
+```json
+{
+  "session_id": "string",
+  "mode": "chat",
+  "answer": "...",
+  "results_count": 0,
+  "lessons": []
+}
+```
+
+Дополнительно backend поддерживает:
 
 - `POST /api/v1/sessions` - создать новую сессию
+- `GET /api/v1/sessions/{session_id}` - состояние сессии и сообщения
 - `POST /api/v1/sessions/{session_id}/close` - завершить сессию
-- `GET /health` и `GET /api/v1/health` - health-check
+- `GET /api/v1/lessons/{lesson_id}` - полная карточка урока (для `lesson.html`)
+- `GET /health`, `GET /api/v1/health`, `GET /health/ready` - проверки работоспособности
 
 ## Структура проекта
 
 ```text
 .
 ├── portal/             # PHP-оболочка раздела
-├── frontend/           # HTML/CSS/JS виджет
+├── frontend/           # HTML/CSS/JS виджет (в т.ч. demo.html, index.html, lesson.html)
 ├── backend/            # FastAPI orchestrator
 ├── rag-service/        # Retrieval и подготовка контекста
 ├── memory-service/     # Redis/Postgres память и история
 ├── embed-service/      # Эмбеддинги
 ├── reranker-service/   # Реранкинг
-├── data/               # lessons.json, raw_data, chroma_db
+├── samples/            # Шаблоны документов и писем для backend (имя каталога должно совпадать с ./samples в compose на регистрозависимых ФС)
+├── data/               # JSON-данные, report_template_schemas/, при необходимости lessons.json, portal_meta.txt; chroma_db/
 └── docker-compose.yml
 ```
 
 ## Текущее состояние
 
-Система уже собрана как единый рабочий каркас и пригодна для дальнейшей разработки. Основная архитектура, режимы, память сессий, retrieval-контур и портал уже разложены по сервисам. Следующие доработки могут касаться качества промптов, улучшения retrieval, подключения целевой LLM и расширения метаинформации раздела.
+Система уже собрана как единый рабочий каркас и пригодна для дальнейшей разработки. Основная архитектура, режимы, память сессий, retrieval-контур (включая дополнительные корпуса JSON и шаблоны отчётов), глоссарий в промпте и портал уже разложены по сервисам. Следующие доработки могут касаться качества промптов, улучшения retrieval, подключения целевой LLM и расширения метаинформации раздела.
